@@ -53,6 +53,11 @@ final class ChatFocusMediaPlaceholderItem: ChatRowItem {
     }
 }
 
+private final class DismissableStickerPreviewController: PreviewModalController {
+    override var handleEvents: Bool { return true }
+    override var containerBackground: NSColor { return NSColor.black.withAlphaComponent(0.3) }
+}
+
 final class ChatFocusMediaPlaceholderView: ChatRowView {
     private let pillBackground = View()
     private let text = TextView()
@@ -116,11 +121,22 @@ final class ChatFocusMediaPlaceholderView: ChatRowView {
             } else if let message = item.message {
                 if let file = message.media.first as? TelegramMediaFile,
                    file.isStaticSticker || file.isAnimatedSticker || file.isVideoSticker {
-                    if let reference = file.stickerReference, let window = self.window as? Window {
-                        showModal(with: StickerPackPreviewModalController(item.context, peerId: message.id.peerId, references: [.stickers(reference)]), for: window)
+                    let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
+                    let viewType: ModalPreviewControllerView.Type
+                    if file.isVideoSticker && !file.isWebm {
+                        viewType = GifPreviewModalView.self
+                    } else if file.isAnimatedSticker || file.isWebm {
+                        viewType = AnimatedStickerPreviewModalView.self
+                    } else {
+                        viewType = StickerPreviewModalView.self
+                    }
+                    let controller = DismissableStickerPreviewController(item.context)
+                    controller.update(with: .file(fileRef, viewType))
+                    if let window = self.window as? Window {
+                        showModal(with: controller, for: window)
                     }
                 } else {
-                    showChatGallery(context: item.context, message: message, item.table, nil, type: .history, chatMode: item.chatInteraction.mode, chatLocation: item.chatInteraction.chatLocation, contextHolder: item.chatInteraction.contextHolder())
+                    showChatGallery(context: item.context, message: message, nil, nil, type: .history, chatMode: item.chatInteraction.mode, chatLocation: item.chatInteraction.chatLocation, contextHolder: item.chatInteraction.contextHolder())
                 }
             }
         }, for: .Click)
