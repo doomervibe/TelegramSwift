@@ -114,7 +114,14 @@ final class ChatFocusMediaPlaceholderView: ChatRowView {
             if let grouped = self.mediaForPlaceholder(from: item.entry) {
                 showPaidMedia(context: item.context, medias: grouped.medias, parent: grouped.parent, firstIndex: 0, firstStableId: ChatHistoryEntryId.mediaId(0, grouped.parent), item.table, nil)
             } else if let message = item.message {
-                showChatGallery(context: item.context, message: message, item.table, nil, type: .history, chatMode: item.chatInteraction.mode, chatLocation: item.chatInteraction.chatLocation, contextHolder: item.chatInteraction.contextHolder())
+                if let file = message.media.first as? TelegramMediaFile,
+                   file.isStaticSticker || file.isAnimatedSticker || file.isVideoSticker {
+                    if let reference = file.stickerReference, let window = self.window as? Window {
+                        showModal(with: StickerPackPreviewModalController(item.context, peerId: message.id.peerId, references: [.stickers(reference)]), for: window)
+                    }
+                } else {
+                    showChatGallery(context: item.context, message: message, item.table, nil, type: .history, chatMode: item.chatInteraction.mode, chatLocation: item.chatInteraction.chatLocation, contextHolder: item.chatInteraction.contextHolder())
+                }
             }
         }, for: .Click)
         needsLayout = true
