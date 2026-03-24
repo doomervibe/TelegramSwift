@@ -202,6 +202,10 @@ final class UpdateTabController: GenericViewController<UpdateTabView> {
         
         genericView.set(background: theme.colors.grayForeground, for: .Normal)
         genericView.isHidden = true
+
+        if FocusProduct.isEnabled {
+            return
+        }
         
         #if APP_STORE
         
@@ -250,6 +254,11 @@ final class UpdateTabController: GenericViewController<UpdateTabView> {
     }
     
     func updateLayout(_ layout: SplitViewState, parentSize: NSSize, isChatList: Bool) {
+        if FocusProduct.isEnabled {
+            genericView.isHidden = true
+            shakeDisposable.set(nil)
+            return
+        }
         genericView.layoutState = layout
         self.parentSize = parentSize
         let bottom = parentSize.height - genericView.frame.height
@@ -288,6 +297,7 @@ class MainViewController: TelegramViewController {
     let navigation: NavigationViewController
     let tabController:TabBarController = TabBarController()
     let contacts:NavigationViewController
+    let search:NavigationViewController
     let settings:AccountViewController
     private let phoneCalls:RecentCallsViewController
     private let layoutDisposable:MetaDisposable = MetaDisposable()
@@ -301,6 +311,7 @@ class MainViewController: TelegramViewController {
         tabController.view.frame = bounds
         self.navigation.frame = bounds
         self.contacts.frame = bounds
+        self.search.frame = bounds
         updateController.updateLayout(context.layout, parentSize: size, isChatList: true)
     }
     
@@ -313,6 +324,11 @@ class MainViewController: TelegramViewController {
         self.contacts.hasBarRightBorder = true
         self.contacts.hasBarLeftBorder = true
         self.contacts._frameRect = self._frameRect
+
+        self.search.applyAppearOnLoad = false
+        self.search.hasBarRightBorder = true
+        self.search.hasBarLeftBorder = true
+        self.search._frameRect = self._frameRect
 
         tabController._frameRect = self._frameRect
         self.navigation._frameRect = self._frameRect
@@ -333,28 +349,35 @@ class MainViewController: TelegramViewController {
         backgroundColor = theme.colors.background
         addSubview(self.tabController.view)
         
-        if !context.isSupport {
-        //#if !APP_STORE
+        if !context.isSupport, !FocusProduct.isEnabled {
             addSubview(updateController.view)
-        //#endif
         }
                 
-        tabController.add(tab: TabItem(image: theme.icons.tab_contacts, selectedImage: theme.icons.tab_contacts_active, controller: contacts))
-        
-        tabController.add(tab: TabItem(image: theme.icons.tab_calls, selectedImage: theme.icons.tab_calls_active, controller: phoneCalls))
-        
+        // Focus fork: use hidden tabs (Chats + Contacts); category strip controls selection.
         tabController.add(tab: TabBadgeItem(context, controller: navigation, image: theme.icons.tab_chats, selectedImage: theme.icons.tab_chats_active, longHoverHandler: { [weak self] control in
             self?.showFastChatSettings(control)
         }))
-        
-        tabController.add(tab: TabAllBadgeItem(context, image: theme.icons.tab_settings, selectedImage: theme.icons.tab_settings_active, controller: settings, longHoverHandler: { [weak self] control in
-            self?.showFastSettings(control)
-        }))
+        tabController.add(tab: TabBadgeItem(context, controller: search, image: theme.icons.tab_calls, selectedImage: theme.icons.tab_calls_active))
+        tabController.add(tab: TabBadgeItem(context, controller: contacts, image: theme.icons.tab_contacts, selectedImage: theme.icons.tab_contacts_active))
+
+        // Hide the tab bar chrome — the strip takes its place.
+        tabController.hideTabView(true)
         
         
         tabController.updateLocalizationAndTheme(theme: theme)
+
+        // Manually mount the navigation view: `tabController.select(index: 0)`
+        // is a no-op when selectedIndex is already 0 (the default after addTab).
+        // We replicate what TabBarController.didChange does.
+        navigation._frameRect = NSMakeRect(0, 0, bounds.width, bounds.height)
+        navigation.view.frame = navigation._frameRect
+        navigation.viewWillAppear(false)
+        tabController.view.addSubview(navigation.view)
+        navigation.viewDidAppear(false)
+        tabController.current = navigation
         
-        self.ready.set(combineLatest(queue: prepareQueue, self.chatList.ready.get(), self.settings.ready.get()) |> map { $0 && $1 })
+        // Focus fork: do not block app startup on nested controller readiness.
+        self.ready.set(.single(true))
         
         
         
@@ -362,10 +385,9 @@ class MainViewController: TelegramViewController {
             guard let `self` = self else {
                 return
             }
-            self.tabController.hideTabView(state == .minimisize)
-            //#if !APP_STORE
+            // Focus fork: tab bar is always hidden (category strip replaces it).
+            self.tabController.hideTabView(true)
             self.updateController.updateLayout(state, parentSize: self.frame.size, isChatList: true)
-            //#endif
         }))
         
         tabController.didChangedIndex = { [weak self] index in
@@ -398,6 +420,7 @@ class MainViewController: TelegramViewController {
                 
         prefDisposable.set((baseAppSettings(accountManager: context.sharedContext.accountManager) |> deliverOnMainQueue).start(next: { [weak self] settings in
             guard let `self` = self else {return}
+            if FocusProduct.isEnabled { return }
             if settings.showCallsTab != self.showCallTabs {
                 self.showCallTabs = settings.showCallsTab
                 if self.showCallTabs {
@@ -559,6 +582,9 @@ class MainViewController: TelegramViewController {
     }
     
     private func updateTabsIfNeeded() {
+        if FocusProduct.isEnabled {
+            return
+        }
         if !tabController.isEmpty && (previousTheme?.colors != theme.colors ||  previousIconColor != theme.colors.accentIcon) {
             var index: Int = 0
             tabController.replace(tab: tabController.tab(at: index).withUpdatedImages(theme.icons.tab_contacts, theme.icons.tab_contacts_active), at: index)
@@ -702,21 +728,10 @@ class MainViewController: TelegramViewController {
         self.tabController.current?.viewDidDisappear(animated)
     }
     
-    var chatIndex: Int {
-        if showCallTabs {
-            return 2
-        } else {
-            return 1
-        }
-    }
-    
-    var settingsIndex: Int {
-        if showCallTabs {
-            return 3
-        } else {
-            return 2
-        }
-    }
+    var chatIndex: Int { return 0 }
+    var searchIndex: Int { return 1 }
+    var contactsIndex: Int { return 2 }
+    var settingsIndex: Int { return 0 } // settings pushed via category strip
     
     
     func openChat(_ index: Int, force: Bool = false) {
@@ -731,13 +746,8 @@ class MainViewController: TelegramViewController {
     }
 
     func showPreferences() {
-        context.bindings.switchSplitLayout(.dual)
-        if self.context.layout != .minimisize {
-            if self.context.layout == .single {
-                self.navigationController?.close()
-            }
-            self.tabController.select(index:settingsIndex)
-        }
+        // Focus fork: settings are opened via the category strip; push directly.
+        context.bindings.rootNavigation().push(GeneralSettingsViewController(context), false)
     }
     
     var effectiveNavigation: NavigationViewController {
@@ -746,6 +756,20 @@ class MainViewController: TelegramViewController {
     
     func showChatList() {
        self.tabController.select(index: self.chatIndex)
+    }
+
+    func showContactsList() {
+        self.tabController.select(index: self.contactsIndex)
+    }
+
+    func showSearchList() {
+        self.tabController.select(index: self.searchIndex)
+        // Auto-focus the search field so the user can start typing immediately.
+        if let searchCtl = (search.controller as? PeersListController) {
+            DispatchQueue.main.async {
+                searchCtl.genericView.searchView.change(state: .Focus, true)
+            }
+        }
     }
     
     override var responderPriority: HandlerPriority {
@@ -766,6 +790,7 @@ class MainViewController: TelegramViewController {
         
         self.chatList = ChatListController(context, mode: .plain)
         self.contacts = NavigationViewController(ContactsController(context), context.window)
+        self.search = NavigationViewController(ChatListController(context, mode: .plain, alwaysShowSearch: true), context.window)
         self.settings = AccountViewController(context)
         self.phoneCalls = RecentCallsViewController(context)
         self.navigation = NavigationViewController(self.chatList, context.window)

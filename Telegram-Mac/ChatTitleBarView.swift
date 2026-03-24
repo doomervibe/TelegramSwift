@@ -10,6 +10,7 @@ import Cocoa
 import TGUIKit
 import Postbox
 import TelegramCore
+import InAppSettings
 import TelegramMedia
 import SwiftSignalKit
 import AVFoundation
@@ -294,6 +295,7 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
     
     var inputActivities:(PeerId, [(Peer, PeerInputActivity)])? {
         didSet {
+            let inputActivities = FocusProduct.isEnabled ? nil : inputActivities
             if let inputActivities = inputActivities, self.chatInteraction.mode != .scheduled && self.chatInteraction.mode != .pinned  {
                 activities.update(with: inputActivities, for: max(frame.width - inset, 160), theme:theme.activity(key: 4, foregroundColor: theme.colors.accent, backgroundColor: theme.colors.background), layout: { [weak self] show in
                     guard let `self` = self else { return }
@@ -337,8 +339,10 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
         callButton.disableActions()
         
                 
+        // Focus fork: badge is allocated but never shown (global unread pill on back button removed).
         badgeNode = GlobalBadgeNode(chatInteraction.context.account, sharedContext: chatInteraction.context.sharedContext, excludePeerId: self.chatInteraction.peerId, view: View(), layoutChanged: {
         })
+        badgeNode.view?.isHidden = true
         
         super.init(controller: controller, textInset: 46)
         
@@ -400,7 +404,7 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
         
         avatarControl.userInteractionEnabled = false
 
-        addSubview(badgeNode.view!)
+        // Focus fork: badge view not added to view hierarchy (removed from back button area).
         
         updateLocalizationAndTheme(theme: theme)
         
@@ -438,7 +442,7 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
     }
     
     func updateSearchButton(hidden: Bool, animated: Bool) {
-        searchButton.isHidden = hidden
+        searchButton.isHidden = hidden || FocusProduct.isEnabled
         needsLayout = true
     }
     
@@ -595,7 +599,7 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
         } else if let titleRect = titleRect {
             activities.view?.setFrameOrigin(titleRect.minX, 25)
         }
-        badgeNode.view!.setFrameOrigin(6,4)
+        // Focus fork: badge view removed from layout.
         
         closeButton.centerY()
         
@@ -645,12 +649,12 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
 
         if let peerView = self.peerView {
                         
+            // Focus fork: badge always hidden; only the back button visibility changes.
+            self.badgeNode.view?.isHidden = true
             switch layoutState {
             case .single:
-                self.badgeNode.view?.isHidden = false
                 self.closeButton.isHidden = false
             default:
-                self.badgeNode.view?.isHidden = true
                 self.closeButton.isHidden = !hasBackButton
             }
             let mode = chatInteraction.mode
@@ -664,31 +668,8 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
             self.textInset = !hasPhoto && !presentation.isTopicMode ? 24 : hasBackButton ? 66 : 46
             
             
-            switch chatInteraction.mode {
-            case .history:
-                if let peer = peerViewMainPeer(peerView) {
-                    if peer.isGroup || peer.isSupergroup || peer.isChannel {
-                        if let groupCall = presentation.groupCall {
-                            if let data = groupCall.data, data.participantCount == 0 && groupCall.activeCall.scheduleTimestamp == nil {
-                                callButton.isHidden = presentation.reportMode != nil
-                            } else {
-                                callButton.isHidden = true
-                            }
-                        } else {
-                            callButton.isHidden = true
-                        }
-                    } else {
-                        callButton.isHidden = !peer.canCall || chatInteraction.peerId == chatInteraction.context.peerId || presentation.reportMode != nil || chatInteraction.isMonoforum
-                    }
-                    
-                    
-                } else {
-                    callButton.isHidden = true
-                }
-                
-            default:
-                callButton.isHidden = true
-            }
+            // Focus fork: call button always hidden.
+            callButton.isHidden = true
 
             
             if let peer = peerViewMainPeer(peerView) {
@@ -723,15 +704,7 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
                 
                 let context = chatInteraction.context
                 
-                if let peer = (peerViewMonoforumMainPeer(peerView) ?? peerViewMainPeer(peerView)) {
-                    if chatInteraction.context.peerId != chatInteraction.peerId || chatInteraction.mode.isSavedMessagesThread, presentation.reportMode == nil {
-                        statusControl = PremiumStatusControl.control(peer, account: context.account, inlinePacksContext: context.inlinePacksContext, left: false, isSelected: false, cached: self.statusControl, animated: false)
-                    }
-                    
-                    if chatInteraction.context.peerId != chatInteraction.peerId || chatInteraction.mode.isSavedMessagesThread, presentation.reportMode == nil {
-                        leftStatusControl = PremiumStatusControl.control(peer, account: context.account, inlinePacksContext: context.inlinePacksContext, left: true, isSelected: false, cached: self.leftStatusControl, animated: false)
-                    }
-                }
+                // Focus fork: premium/verified status controls hidden in the chat title bar.
                 
                 
                 if peer.isGroup || peer.isSupergroup || peer.isChannel {
@@ -874,6 +847,10 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
                 } else {
                     result = result.withUpdatedTitle(strings().peerSavedMessages).withUpdatedStatus("")
                 }
+            }
+            
+            if FocusProduct.isEnabled, presentation.threadInfo == nil, !presentation.isTopicMode {
+                result = result.withUpdatedStatus("")
             }
             
             if (status == nil || !status!.isEqual(to: result.status) || force) {

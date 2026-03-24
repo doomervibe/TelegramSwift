@@ -44,13 +44,24 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
     private var customAction: TextView?
     
     private var rightsActions: [ImageButton] = []
+    private let avatarGhost: View = View()
+    private var avatarRevealWorkItem: DispatchWorkItem?
+    // Focus fork: slower reveal gives a more deliberate, contemplative feel.
+    private let avatarRevealDelay: TimeInterval = 1.4
+    private let avatarRevealDuration: CGFloat = 0.55
+    private let avatarHideDuration: CGFloat = 0.38
     
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         container.frame = bounds
         photoContainer.addSubview(image)
+        container.addSubview(avatarGhost)
         container.addSubview(photoContainer)
         container.displayDelegate = self
+        avatarGhost.wantsLayer = true
+        avatarGhost.layer?.cornerRadius = 18
+        avatarGhost.backgroundColor = NSColor(white: 0.88, alpha: 1.0)
+        avatarGhost.isHidden = true
         containerView.addSubview(container)
         image.userInteractionEnabled = false
         containerView.addSubview(rightSeparatorView)
@@ -262,6 +273,62 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
         self.container.needsDisplay = true
     }
     
+    // Returns true when this row's avatar should be hidden until mouse hover.
+    private var isHoverOnlyAvatar: Bool {
+        if let item = self.item as? ShortPeerRowItem, item.focusHoverOnlyAvatar {
+            return true
+        }
+        let className = String(describing: type(of: self.item as AnyObject))
+        return className.contains("Search") ||
+               className.contains("RecentPeerRowItem") ||
+               className.contains("ChatListSearch") ||
+               className.contains("ChatListMessage")
+    }
+    
+    private func cancelAvatarReveal() {
+        avatarRevealWorkItem?.cancel()
+        avatarRevealWorkItem = nil
+    }
+    
+    private func setAvatarVisible(_ visible: Bool, animated: Bool, duration: CGFloat) {
+        let avatarTarget: Float = visible ? 1.0 : 0.0
+        let ghostTarget: Float = visible ? 0.0 : 1.0
+        let avatarCurrent = photoContainer.layer?.opacity ?? (visible ? 0.0 : 1.0)
+        let ghostCurrent = avatarGhost.layer?.opacity ?? (visible ? 1.0 : 0.0)
+        
+        if animated {
+            if abs(avatarCurrent - avatarTarget) > 0.01 {
+                photoContainer.layer?.animateAlpha(from: CGFloat(avatarCurrent), to: CGFloat(avatarTarget), duration: duration)
+            }
+            if abs(ghostCurrent - ghostTarget) > 0.01 {
+                avatarGhost.layer?.animateAlpha(from: CGFloat(ghostCurrent), to: CGFloat(ghostTarget), duration: duration)
+            }
+        }
+        
+        photoContainer.layer?.opacity = avatarTarget
+        avatarGhost.layer?.opacity = ghostTarget
+    }
+    
+    private func resetHoverAvatarStateForReuse() {
+        cancelAvatarReveal()
+        photoContainer.isHidden = true
+        photoContainer.layer?.opacity = 0.0
+        avatarGhost.layer?.opacity = 0.0
+        avatarGhost.isHidden = true
+        photoOuter?.isHidden = true
+        photoBadge?.isHidden = true
+    }
+    
+    private func updateHoverOnlyAvatarVisibility(animated: Bool, applyDelay: Bool) {
+        cancelAvatarReveal()
+        photoContainer.isHidden = true
+        photoContainer.layer?.opacity = 0.0
+        avatarGhost.layer?.opacity = 0.0
+        avatarGhost.isHidden = true
+        photoOuter?.isHidden = true
+        photoBadge?.isHidden = true
+    }
+
     override func updateMouse(animated: Bool) {
         super.updateMouse(animated: animated)
         updateColors()
@@ -270,6 +337,7 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
            return
         }
         item.badgeNode?.isSelected = isRowSelected
+        updateHoverOnlyAvatarVisibility(animated: animated, applyDelay: true)
     }
     
     override func layout() {
@@ -501,6 +569,11 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
                 action.centerY(x: x)
                 x -= (action.frame.width + 10)
             }
+        }
+        
+        if !avatarGhost.isHidden {
+            avatarGhost.frame = photoContainer.frame
+            avatarGhost.layer?.cornerRadius = photoContainer.frame.height / 2
         }
     }
     
@@ -936,6 +1009,8 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
         needsLayout = true
         self.container.setNeedsDisplayLayer()
         
+        // Set initial avatar visibility on reuse; reveal only after delayed hover.
+        resetHoverAvatarStateForReuse()
         
         viewDidMoveToSuperview()
     }
@@ -1066,6 +1141,10 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
             default:
                 break
             }
+        }
+        
+        if superview == nil {
+            cancelAvatarReveal()
         }
         
        

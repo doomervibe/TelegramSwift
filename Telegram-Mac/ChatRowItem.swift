@@ -258,7 +258,7 @@ class ChatRowItem: TableRowItem {
         if isBubbled {
             return 10
         } else {
-            return 6
+            return FocusProduct.isEnabled ? 10 : 6
         }
     }
     
@@ -327,11 +327,12 @@ class ChatRowItem: TableRowItem {
             
             
         } else {
+            let maxWidth: CGFloat = FocusProduct.isEnabled ? width : min(800, width)
             if case .Full = itemType {
                 let additionWidth:CGFloat = date?.layoutSize.width ?? 20
-                widthForContent = min(800, width) - self.contentOffset.x - 44 - additionWidth
+                widthForContent = maxWidth - self.contentOffset.x - 44 - additionWidth
             } else {
-                widthForContent = min(800, width) - self.contentOffset.x - rightSize.width - 44
+                widthForContent = maxWidth - self.contentOffset.x - rightSize.width - 44
             }
         }
         
@@ -399,7 +400,7 @@ class ChatRowItem: TableRowItem {
         }
         
         if !isBubbled, case .Full = self.itemType, self is ChatMessageItem {
-            height += 2
+            height += FocusProduct.isEnabled ? 8 : 2
         }
         
         if !captionLayouts.isEmpty {
@@ -675,7 +676,12 @@ class ChatRowItem: TableRowItem {
                 }
             }
         } else {
-            inset += 36 + 10
+            if FocusProduct.isEnabled {
+                // No avatar space in focus mail mode — use minimal padding
+                inset += 8
+            } else {
+                inset += 36 + 10
+            }
         }
         
         
@@ -693,6 +699,9 @@ class ChatRowItem: TableRowItem {
             return true
         }
         if !isBubbled {
+            if FocusProduct.isEnabled {
+                return false
+            }
             if case .Full = itemType {
                 return true
             } else {
@@ -993,7 +1002,7 @@ class ChatRowItem: TableRowItem {
     }
     
     var shareVisible: Bool {
-        
+        if FocusProduct.isEnabled { return false }
         guard let message = message else {
             return false
         }
@@ -1456,6 +1465,9 @@ class ChatRowItem: TableRowItem {
     }
     
     var channelHasCommentButton: Bool {
+        if FocusProduct.isEnabled {
+            return false
+        }
         if chatInteraction.mode == .scheduled || chatInteraction.isLogInteraction {
             return false
         }
@@ -1699,7 +1711,7 @@ class ChatRowItem: TableRowItem {
             }
             let context = self.context
             let chatInteraction = self.chatInteraction
-            if let reactions = reactions, !reactions.reactions.isEmpty, let available = context.reactions.available {
+            if let reactions = reactions, !reactions.reactions.isEmpty, let available = context.reactions.available, !FocusProduct.isEnabled {
                 let layout = ChatReactionsLayout(context: chatInteraction.context, message: message, available: available, peerAllowed: chatInteraction.presentation.allowedReactions, savedMessageTags: entry.additionalData.savedMessageTags, engine: chatInteraction.context.reactions, theme: presentation, renderType: renderType, currentTag: currentTag, isIncoming: isIncoming, isOutOfBounds: isBubbleFullFilled && (self.captionLayouts.isEmpty || invertMedia) && (commentsBubbleData == nil || !invertMedia), hasWallpaper: presentation.hasWallpaper, stateOverlayTextColor: isStateOverlayLayout ? stateOverlayTextColor : (!hasBubble ? presentation.colors.grayText : presentation.chat.grayText(isIncoming, entry.renderType == .bubble)), openInfo: { peerId in
                     PeerInfoController.push(navigation: context.bindings.rootNavigation(), context: context, peerId: peerId, source: .reaction(message.id))
                 }, runEffect: { [weak chatInteraction] value in
@@ -2033,7 +2045,7 @@ class ChatRowItem: TableRowItem {
                 }
             }
             
-            if let info = message.forwardInfo, !message.isImported {
+            if !FocusProduct.isEnabled, let info = message.forwardInfo, !message.isImported {
                 
                 
                 var accept:Bool = !isHasSource && message.id.peerId != context.peerId
@@ -2268,9 +2280,11 @@ class ChatRowItem: TableRowItem {
                 let attr:NSMutableAttributedString = NSMutableAttributedString()
                 
                 if let peer = titlePeer {
-                    var nameColor:NSColor = presentation.chat.linkColor(isIncoming, object.renderType == .bubble)
+                    var nameColor:NSColor = FocusProduct.isEnabled
+                        ? theme.colors.grayText
+                        : presentation.chat.linkColor(isIncoming, object.renderType == .bubble)
                     
-                    if let _nameColor = peer.nameColor {
+                    if !FocusProduct.isEnabled, let _nameColor = peer.nameColor {
                         nameColor = context.peerNameColors.get(_nameColor).main
                     }
                     if coreMessageMainPeer(message) is TelegramChannel || coreMessageMainPeer(message) is TelegramGroup {
@@ -2417,7 +2431,7 @@ class ChatRowItem: TableRowItem {
             
             let threadId: Int64? = chatInteraction.chatLocation.threadId
             
-            if let message = effectiveCommentMessage {
+            if !FocusProduct.isEnabled, let message = effectiveCommentMessage {
                 for attribute in message.attributes {
                     if let attribute = attribute as? ReplyThreadMessageAttribute, attribute.count > 0 {
                         if let peer = chatInteraction.peer, peer.isSupergroup, !chatInteraction.mode.isThreadMode {
@@ -2510,7 +2524,7 @@ class ChatRowItem: TableRowItem {
                         self.replyModel = ReplyModel(message: message, replyMessageId: message.id, context: context, replyMessage: message, quote: attribute.quote, presentation: replyPresentation, customHeader: attribute.authorName)
                     }
                 }
-                if let attribute = attribute as? ViewCountMessageAttribute {
+                if let attribute = attribute as? ViewCountMessageAttribute, !FocusProduct.isEnabled {
                     let attr: NSAttributedString = .initialize(string: max(1, attribute.count).prettyNumber, color: isStateOverlayLayout ? stateOverlayTextColor : !hasBubble ? theme.colors.grayText : theme.chat.grayText(isIncoming, object.renderType == .bubble), font: renderType == .bubble ? .normal(.small) : .normal(.short))
                     
                     self.channelViews = TextViewLayout(attr, maximumNumberOfLines: 1)
@@ -2545,7 +2559,7 @@ class ChatRowItem: TableRowItem {
                 } else {
                     paid = false
                 }
-                if let attribute = attribute as? ReplyMarkupMessageAttribute, attribute.flags.contains(.inline) {
+                if !FocusProduct.isEnabled, let attribute = attribute as? ReplyMarkupMessageAttribute, attribute.flags.contains(.inline) {
                     if message.restrictedText(context.contentSettings) == nil {
                         if !message.hasExtendedMedia {
                             let xtrAmount: Int64?
@@ -2616,12 +2630,60 @@ class ChatRowItem: TableRowItem {
         super.init(initialSize)
     }
     
+    private static func focusPlaceholderLabel(for message: Message) -> String? {
+        guard let media = message.media.first else { return nil }
+        if media is TelegramMediaImage {
+            return "📷 Photo"
+        }
+        if let file = media as? TelegramMediaFile {
+            if file.isVoice || file.isMusic {
+                return nil
+            }
+            if file.isStaticSticker || file.isAnimatedSticker || file.isVideoSticker {
+                return "[Sticker]"
+            }
+            if file.isInstantVideo {
+                return "📹 Video"
+            }
+            if file.isVideo && !file.isAnimated {
+                return "📹 Video"
+            }
+            if file.isVideo && file.isAnimated {
+                return "🎞️ GIF"
+            }
+            if file.mimeType.lowercased().hasSuffix("gif") {
+                return "🎞️ GIF"
+            }
+            if !file.isVideo && file.isAnimated && !file.mimeType.lowercased().hasSuffix("gif") {
+                return "[Sticker]"
+            }
+            return nil
+        }
+        if media is TelegramMediaStory {
+            return "📷 Photo"
+        }
+        return nil
+    }
+    
+    private static func focusGroupedPlaceholderTitle(for entry: ChatHistoryEntry) -> String? {
+        guard case let .groupedPhotos(messages, _) = entry else { return nil }
+        let count = messages.compactMap { $0.message }.filter { !$0.media.isEmpty }.count
+        guard count > 0 else { return nil }
+        return "📷 \(count) Photos / Videos"
+    }
+    
     public static func item(_ initialSize:NSSize, from entry:ChatHistoryEntry, interaction:ChatInteraction, theme: TelegramPresentationTheme) -> TableRowItem {
         
         switch entry {
         case .UnreadEntry:
+            if FocusProduct.isEnabled {
+                return GeneralRowItem(initialSize, height: 0, stableId: entry.stableId, backgroundColor: .clear)
+            }
             return ChatUnreadRowItem(initialSize, interaction, interaction.context, entry, theme: theme)
         case .groupedPhotos:
+            if FocusProduct.isEnabled, let title = focusGroupedPlaceholderTitle(for: entry) {
+                return ChatFocusMediaPlaceholderItem(initialSize, interaction, interaction.context, entry, title: title, theme: theme)
+            }
             return ChatGroupedItem(initialSize, interaction, interaction.context, entry, theme: theme)
         case .DateEntry:
             return ChatDateStickItem(initialSize, entry, interaction: interaction, theme: theme)
@@ -2644,6 +2706,9 @@ class ChatRowItem: TableRowItem {
         }
         
         if let message = entry.message {
+            if FocusProduct.isEnabled, message.adAttribute == nil, let label = focusPlaceholderLabel(for: message) {
+                return ChatFocusMediaPlaceholderItem(initialSize, interaction, interaction.context, entry, title: label, theme: theme)
+            }
             if message.adAttribute != nil {
                 return ChatMessageItem(initialSize, interaction, interaction.context, entry, theme: theme)
             } else if message.media.count == 0 || message.anyMedia is TelegramMediaWebpage {

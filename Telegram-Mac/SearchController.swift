@@ -144,6 +144,9 @@ final class SearchControllerArguments {
     let openStorySearch:(SearchStoryListContext.State)->Void
     let toggleMessageSourceValue:(SearchController.MessaagesSourceValue)->Void
     let removeAd:(AdPeer, Bool)->Void
+    // Focus fork: tag context for media-centric row rendering, and a direct message open callback.
+    var searchTags: SearchTags?
+    var openMessage: ((MessageId) -> Void)?
     init(context: AccountContext, target: SearchController.Target, removeRecentPeerId:@escaping(PeerId)->Void, clearRecent:@escaping()->Void, openTopPeer:@escaping(PopularItemType)->Void, setPeerAsTag: @escaping(Peer)->Void, openStory:@escaping(StoryInitialIndex?)->Void, openStorySearch:@escaping(SearchStoryListContext.State)->Void, toggleMessageSourceValue:@escaping(SearchController.MessaagesSourceValue)->Void, removeAd:@escaping(AdPeer, Bool)->Void) {
         self.context = context
         self.target = target
@@ -519,6 +522,17 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<ChatListSearchEntry
     let (deleted, inserted, updated) = proccessEntriesWithoutReverse(from, right: to, { entry -> TableRowItem in
         switch entry.entry {
         case let .message(message, query, combinedState, threadInfo, _):
+
+            // Focus fork: for media-specific tagged searches (voice, files, links, music),
+            // show a media-centric row instead of a chat-list-style row.
+            let isMediaTagSearch = arguments.searchTags?.messageTags != nil
+            if isMediaTagSearch, let openMsg = arguments.openMessage,
+               let mediaItem = FocusMediaSearchRowItem(initialSize, context: arguments.context, message: message, action: {
+                openMsg(message.id)
+            }) {
+                return mediaItem
+            }
+
             var peer = RenderedPeer(message: message)
             if let group = message.peers[message.id.peerId] as? TelegramGroup, let migrationReference = group.migrationReference {
                 if let channelPeer = message.peers[migrationReference.peerId] {
@@ -724,11 +738,16 @@ struct AppSearchOptions : OptionSet {
         if flags.contains(AppSearchOptions.chats) {
             rawValue |= AppSearchOptions.chats.rawValue
         }
+        
+        if flags.contains(AppSearchOptions.contactsOnly) {
+            rawValue |= AppSearchOptions.contactsOnly.rawValue
+        }
         self.rawValue = rawValue
     }
     
     static let messages = AppSearchOptions(rawValue: 1)
     static let chats = AppSearchOptions(rawValue: 2)
+    static let contactsOnly = AppSearchOptions(rawValue: 4)
 
 }
 
@@ -885,6 +904,7 @@ class SearchController: GenericViewController<TableView>,TableViewDelegate {
         self._messagesValue.set(.single((ExternalSearchMessages(), false)))
         self.globalTagsValue.set(globalTags)
         self.searchTags = globalTags
+        self.arguments?.searchTags = globalTags
     }
     
     func setCachedMessages(_ cached: CachedSearchMessages) {
@@ -963,6 +983,9 @@ class SearchController: GenericViewController<TableView>,TableViewDelegate {
                 let localPeers:Signal<([RenderedPeer], [PeerId: UnreadSearchBadge], EngineDataMap<TelegramEngine.EngineData.Item.Peer.StoryStats>.Result), NoError> = combineLatest(all.map {
                     return context.account.postbox.searchPeers(query: $0) |> map {
                         $0.filter { peer in
+                            if options.contains(.contactsOnly) {
+                                return peer.peer is TelegramUser
+                            }
                             if let listType = globalTags.listType {
                                 switch listType {
                                 case .channels:
@@ -1074,14 +1097,16 @@ class SearchController: GenericViewController<TableView>,TableViewDelegate {
                                 adPeers = .single([])
                             }
                             
-                            foundRemotePeers = query.hasPrefix("#") || query.hasPrefix("$") || !options.contains(.chats) || !globalTags.isEmpty || globalTags.listType == .bots ? .single(([], [], false)) : .single(([], [], true)) |> then(combineLatest(context.engine.contacts.searchRemotePeers(query: query, scope: globalTags.scope(.allChats)), adPeers)
+                            foundRemotePeers = query.hasPrefix("#") || query.hasPrefix("$") || !options.contains(.chats) || !globalTags.isEmpty || globalTags.listType == .bots || options.contains(.contactsOnly) ? .single(([], [], false)) : .single(([], [], true)) |> then(combineLatest(context.engine.contacts.searchRemotePeers(query: query, scope: globalTags.scope(.allChats)), adPeers)
                                 |> delay(0.2, queue: prepareQueue)
                                 |> map { (founds, adPeers) -> ([FoundPeer], [FoundPeer], [AdPeer]) in
                                     return (founds.0.filter { found -> Bool in
+                                        if options.contains(.contactsOnly) && !(found.peer is TelegramUser) { return false }
                                         let first = ids[found.peer.id] == nil
                                         ids[found.peer.id] = found.peer.id
                                         return first
                                     }, founds.1.filter { found -> Bool in
+                                        if options.contains(.contactsOnly) && !(found.peer is TelegramUser) { return false }
                                         let first = ids[found.peer.id] == nil
                                         ids[found.peer.id] = found.peer.id
                                         return first
@@ -1989,6 +2014,12 @@ class SearchController: GenericViewController<TableView>,TableViewDelegate {
         
         setPeerAsTag = { [weak self] peer in
             self?.setPeerAsTag?(peer)
+        }
+
+        // Focus fork: provide searchTags reference and a direct message opener for media rows.
+        self.arguments.searchTags = tags
+        self.arguments.openMessage = { messageId in
+            open(.chatId(.chatList(messageId.peerId), messageId.peerId, -1), messageId, false)
         }
         
         globalDisposable.set(context.globalPeerHandler.get().start(next: { [weak self] peerId in

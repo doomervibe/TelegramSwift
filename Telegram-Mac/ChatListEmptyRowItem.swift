@@ -11,6 +11,58 @@ import Cocoa
 import SwiftSignalKit
 import Postbox
 import TelegramCore
+import InAppSettings
+
+
+final class ChatListSectionHeaderItem: TableRowItem {
+    private let _stableId: AnyHashable
+    override var stableId: AnyHashable { return _stableId }
+
+    let title: String
+
+    init(_ initialSize: NSSize, stableId: AnyHashable, title: String) {
+        self._stableId = stableId
+        self.title = title
+        super.init(initialSize)
+    }
+
+    override var height: CGFloat { return 28 }
+    override var isSelectable: Bool { return false }
+    override func viewClass() -> AnyClass { return ChatListSectionHeaderView.self }
+}
+
+private final class ChatListSectionHeaderView: TableRowView {
+    private let label = TextView()
+
+    required init(frame: NSRect) {
+        super.init(frame: frame)
+        addSubview(label)
+        label.isSelectable = false
+        label.userInteractionEnabled = false
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var backdorColor: NSColor { return theme.colors.listBackground }
+
+    override func set(item: TableRowItem, animated: Bool = false) {
+        super.set(item: item, animated: animated)
+        guard let item = item as? ChatListSectionHeaderItem else { return }
+        let layout = TextViewLayout(.initialize(
+            string: item.title.uppercased(),
+            color: theme.colors.grayText,
+            font: .medium(10)
+        ))
+        layout.measure(width: frame.width - 20)
+        label.update(layout)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        label.setFrameOrigin(NSMakePoint(20, (frame.height - label.frame.height) / 2))
+    }
+}
 
 
 class ChatListEmptyRowItem: TableRowItem {

@@ -7,6 +7,7 @@
 //
 
 import Cocoa
+import InAppSettings
 import TGUIKit
 import TelegramCore
 import Localization
@@ -620,7 +621,7 @@ private func accountInfoEntries(peerView:PeerView, context: AccountContext, acco
         index += 1
     }
     
-    if let state = appUpdateState, !context.isSupport {
+    if !FocusProduct.isEnabled, let state = appUpdateState, !context.isSupport {
         entries.append(.update(index: index, viewType: .singleItem, state: AnyUpdateStateEquatable(any: state)))
         index += 1
     }

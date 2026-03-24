@@ -260,7 +260,7 @@ public func chatListFilterItems(engine: TelegramEngine, accountManager: AccountM
                             if data.categories.contains(.bots) {
                                 tags.append(.bot)
                             }
-                            if data.categories.contains(.channels) {
+                            if data.categories.contains(.channels), !FocusProduct.isEnabled {
                                 tags.append(.channel)
                             }
                             

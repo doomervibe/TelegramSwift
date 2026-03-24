@@ -137,7 +137,7 @@ enum ApplicationContextLaunchAction {
 }
 
 
-let leftSidebarWidth: CGFloat = 72
+let leftSidebarWidth: CGFloat = 120
 
 private final class ApplicationContainerView: View {
     fileprivate let splitView: SplitView
@@ -201,6 +201,7 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
     private var entertainment: EntertainmentViewController?
     
     private var leftSidebarController: LeftSidebarController?
+    private var focusCategoryStripController: FocusCategoryStripController?
     
     private let loggedOutDisposable = MetaDisposable()
     
@@ -653,11 +654,11 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
             switch navigation {
             case .settings:
                 self.launchAction = .preferences
-                _ready.set(leftController.settings.ready.get())
+                _ready.set(.single(true))
                 leftController.tabController.select(index: leftController.settingsIndex)
             case let .profile(peer, necessary):
                 
-                _ready.set(leftController.chatList.ready.get())
+                _ready.set(.single(true))
                 self.leftController.tabController.select(index: self.leftController.chatIndex)
 
                 if (necessary || context.layout != .single) {
@@ -667,15 +668,15 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
 
                     self.launchAction = .navigate(controller)
 
-                    self._ready.set(combineLatest(self.leftController.chatList.ready.get(), controller.ready.get()) |> map { $0 && $1 })
+                    self._ready.set(.single(true))
                     self.leftController.tabController.select(index: self.leftController.chatIndex)
                 } else {
-                    _ready.set(leftController.chatList.ready.get())
+                    _ready.set(.single(true))
                     self.leftController.tabController.select(index: self.leftController.chatIndex)
                 }
             case let .chat(peerId, necessary):
                 
-                _ready.set(leftController.chatList.ready.get())
+                _ready.set(.single(true))
                 self.leftController.tabController.select(index: self.leftController.chatIndex)
                 
                 if (necessary || context.layout != .single) {
@@ -685,16 +686,16 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
 
                     self.launchAction = .navigate(controller)
 
-                    self._ready.set(combineLatest(self.leftController.chatList.ready.get(), controller.ready.get()) |> map { $0 && $1 })
+                    self._ready.set(.single(true))
                     self.leftController.tabController.select(index: self.leftController.chatIndex)
                 } else {
                    // self._ready.set(.single(true))
-                    _ready.set(leftController.chatList.ready.get())
+                    _ready.set(.single(true))
                     self.leftController.tabController.select(index: self.leftController.chatIndex)
                 }
             case let .thread(threadId, fromId, threadData, _):
                 self.leftController.tabController.select(index: self.leftController.chatIndex)
-                self._ready.set(self.leftController.chatList.ready.get())
+                self._ready.set(.single(true))
                 
                 if let fromId = fromId {
                     context.navigateToThread(threadId, fromId: fromId)
@@ -704,7 +705,7 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
             }
         } else {
            // self._ready.set(.single(true))
-            _ready.set(leftController.chatList.ready.get())
+            _ready.set(.single(true))
             leftController.tabController.select(index: leftController.chatIndex)
           //  _ready.set(leftController.ready.get())
         }
@@ -731,69 +732,102 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
     private let foldersReadyDisposable = MetaDisposable()
     private func updateLeftSidebar(with folders: ChatListFolders, layout: SplitViewState, animated: Bool) -> Void {
         
+        // Always set the navigation bar position so window traffic lights sit correctly.
         if let window = self.window as? AppWindow {
-            if (folders.sidebar && !folders.isEmpty) || layout == .minimisize {
-                self.context.bindings.rootNavigation().navigationBarLeftPosition = 0
-                window.initialButtonPoint = .system
-            } else {
-                self.context.bindings.rootNavigation().navigationBarLeftPosition = layout == .single ? Window.controlsInset : 0
-                window.initialButtonPoint = .app
-            }
+            self.context.bindings.rootNavigation().navigationBarLeftPosition = Window.controlsInset
+            window.initialButtonPoint = .app
         }
 
-                
-        let currentSidebar = !folders.isEmpty && (folders.sidebar)
-        let previousSidebar = self.folders == nil ? nil : !self.folders!.isEmpty && (self.folders!.sidebar)
-
-        let readySignal: Signal<Bool, NoError>
-        
-        if currentSidebar != previousSidebar {
-            if !currentSidebar {
-                leftSidebarController?.removeFromSuperview()
-                leftSidebarController = nil
-                readySignal = .single(true)
-            } else {
-                let controller = LeftSidebarController(context, filterData: leftController.chatList.filterSignal, updateFilter: leftController.chatList.updateFilter)
-                controller._frameRect = NSMakeRect(0, 0, leftSidebarWidth, window.frame.height)
-                controller.loadViewIfNeeded()
-                self.leftSidebarController = controller
-                readySignal = controller.ready.get() |> take(1)
-            }
-            let enlarge: CGFloat
+        // Focus fork: always show the category strip; skip the stock folder sidebar entirely.
+        if focusCategoryStripController == nil {
+            let strip = FocusCategoryStripController(context)
+            strip._frameRect = NSMakeRect(0, 0, leftSidebarWidth, window.frame.height)
+            strip.loadViewIfNeeded()
+            self.focusCategoryStripController = strip
             
-            if currentSidebar && previousSidebar != nil {
-                enlarge = leftSidebarWidth
-            } else {
-                if previousSidebar == true {
-                    enlarge = -leftSidebarWidth
-                } else {
-                    enlarge = 0
-                }
+            // Wire category changes to the chat list filter.
+            strip.setSelectionHandler { [weak self] category in
+                self?.handleCategorySelection(category)
             }
             
-            foldersReadyDisposable.set(readySignal.start(next: { [weak self] _ in
-                guard let `self` = self else {
-                    return
-                }
-                self.view.updateLeftSideView(self.leftSidebarController?.genericView, animated: animated)
-                if !self.window.isFullScreen, let screen = self.window.screen {
-                    self.window.setFrame(NSMakeRect(max(0, self.window.frame.minX - enlarge), self.window.frame.minY, min(self.window.frame.width + enlarge, screen.frame.width), self.window.frame.height), display: true, animate: false)
-                }
-                self.updateMinMaxWindowSize(animated: animated)
+            foldersReadyDisposable.set((Signal<Bool, NoError>.single(true) |> deliverOnMainQueue).start(next: { [weak self] _ in
+                guard let self = self else { return }
+                self.view.updateLeftSideView(self.focusCategoryStripController?.view, animated: false)
+                self.updateMinMaxWindowSize(animated: false)
             }))
-                        
-            
         }
+
         self.folders = folders
         self.previousLayout = layout
     }
     
+    private func handleCategorySelection(_ category: FocusCategory) {
+        rightController.close(animated: true)
+
+        let titleMap: [FocusCategory: String] = [
+            .inbox:       "Inbox",
+            .digest:      "Channels",
+            .channels:    "Channels",
+            .archive:     "Archive",
+            .saved:       "Saved Messages",
+            .contacts:    "Contacts",
+            .search:      "Search",
+            .stories:     "Stories",
+        ]
+        leftController.chatList.genericView.focusCategoryOverride = titleMap[category]
+
+        // When leaving archive, pop that controller back to the root chat list.
+        if category != .archive, leftController.navigation.stackCount > 1 {
+            leftController.navigation.back(animated: false)
+        }
+
+        switch category {
+        case .inbox:
+            leftController.chatList.activeCategory = .inbox
+            leftController.showChatList()
+        case .digest:
+            leftController.chatList.activeCategory = .digest
+            leftController.showChatList()
+        case .channels:
+            leftController.chatList.activeCategory = .channels
+            leftController.showChatList()
+        case .archive:
+            leftController.showChatList()
+            // Push the archive folder controller directly so archived chats are shown as
+            // a list, not hidden behind a single "Archived Chats" group row.
+            let alreadyShowingArchive = (leftController.navigation.controller as? ChatListController)?.mode.groupId == .archive
+            if !alreadyShowingArchive {
+                if leftController.navigation.stackCount > 1 {
+                    leftController.navigation.back(animated: false)
+                }
+                leftController.navigation.push(ChatListController(context, modal: false, mode: .folder(.archive)), false)
+            }
+        case .saved:
+            leftController.chatList.activeCategory = .inbox
+            leftController.showChatList()
+            navigateToChat(
+                navigation: rightController,
+                context: context,
+                chatLocation: .peer(context.peerId),
+                animated: false
+            )
+        case .contacts:
+            leftController.chatList.activeCategory = .inbox
+            leftController.showContactsList()
+        case .search:
+            leftController.showSearchList()
+        case .stories:
+            leftController.chatList.activeCategory = .stories
+            leftController.showChatList()
+        case .settings:
+            leftController.chatList.activeCategory = .inbox
+            rightController.push(GeneralSettingsViewController(context), false)
+        }
+    }
+    
     
     private func updateMinMaxWindowSize(animated: Bool) {
-        var width: CGFloat = 380
-        if leftSidebarController != nil {
-            width += leftSidebarWidth
-        }
+        var width: CGFloat = 380 + leftSidebarWidth
         if context.layout == .minimisize {
             width += 70
         }
@@ -864,47 +898,31 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
     func splitViewDidNeedSwapToLayout(state: SplitViewState) {
         let previousState = self.view.splitView.state
         self.view.splitView.removeAllControllers()
-        let w:CGFloat = FastSettings.leftColumnWidth
         FastSettings.isMinimisize = false
         self.view.splitView.mustMinimisize = false
-        switch state {
-        case .single:
-            rightController.empty = leftController
-            
-            if rightController.modalAction != nil {
-                if rightController.controller is ChatController {
-                    rightController.push(ForwardChatListController(context), false)
-                }
+
+        // Focus fork: always single-column — the category strip (outside SplitView)
+        // fills the left role; the right nav controller fills the entire remaining width.
+        rightController.empty = leftController
+
+        if rightController.modalAction != nil {
+            if rightController.controller is ChatController {
+                rightController.push(ForwardChatListController(context), false)
             }
-            if rightController.stackCount == 1, previousState != .none {
-                leftController.viewWillAppear(false)
-            }
-            self.view.splitView.addController(controller: rightController, proportion: SplitProportion(min:380, max:CGFloat.greatestFiniteMagnitude))
-            if rightController.stackCount == 1, previousState != .none {
-                leftController.viewDidAppear(false)
-            }
-            
-        case .dual:
-            rightController.empty = emptyController
-            if rightController.controller is ForwardChatListController {
-                rightController.back(animated:false)
-            }
-            self.view.splitView.addController(controller: leftController, proportion: SplitProportion(min:w, max:w))
-            self.view.splitView.addController(controller: rightController, proportion: SplitProportion(min:380, max:CGFloat.greatestFiniteMagnitude))
-        case .minimisize:
-            self.view.splitView.mustMinimisize = true
-            FastSettings.isMinimisize = true
-            self.view.splitView.addController(controller: leftController, proportion: SplitProportion(min:70, max:70))
-            self.view.splitView.addController(controller: rightController, proportion: SplitProportion(min:380, max:CGFloat.greatestFiniteMagnitude))
-        default:
-            break;
         }
-        
+        if rightController.stackCount == 1, previousState != .none {
+            leftController.viewWillAppear(false)
+        }
+        self.view.splitView.addController(controller: rightController, proportion: SplitProportion(min: 380, max: CGFloat.greatestFiniteMagnitude))
+        if rightController.stackCount == 1, previousState != .none {
+            leftController.viewDidAppear(false)
+        }
+
         updateMinMaxWindowSize(animated: false)
         DispatchQueue.main.async {
             self.view.splitView.needsLayout = true
         }
-        context.layout = state
+        context.layout = .single
     }
     
 

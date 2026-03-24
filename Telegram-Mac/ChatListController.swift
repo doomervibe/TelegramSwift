@@ -147,6 +147,11 @@ enum UIChatListEntryId : Hashable {
     case birthdays
     case grace
     case custom
+    case sectionHeader(String)
+    /// Focus Stories tab: horizontal story rail (stable row identity).
+    case storiesRail
+    /// Focus Stories tab: empty state when there are no story subscriptions.
+    case storiesEmpty
 }
 
 
@@ -354,6 +359,10 @@ enum UIChatListEntry : Identifiable, Comparable {
     case grace(Bool)
     case space
     case loading(ChatListFilter)
+    case sectionHeader(String)
+    /// Merged visible + hidden story subscriptions for the Focus Stories rail-only tab.
+    case storiesRail(EngineStorySubscriptions)
+    case storiesEmpty
     static func == (lhs: UIChatListEntry, rhs: UIChatListEntry) -> Bool {
         switch lhs {
         case let .chat(entry, activity, additionItem, filter, generalStatus, selectedForum, appearMode, hideContent, folders, canPreviewChat):
@@ -428,6 +437,24 @@ enum UIChatListEntry : Identifiable, Comparable {
             } else {
                 return false
             }
+        case let .sectionHeader(lhsTitle):
+            if case .sectionHeader(let rhsTitle) = rhs {
+                return lhsTitle == rhsTitle
+            } else {
+                return false
+            }
+        case let .storiesRail(lhsState):
+            if case .storiesRail(let rhsState) = rhs {
+                return lhsState == rhsState
+            } else {
+                return false
+            }
+        case .storiesEmpty:
+            if case .storiesEmpty = rhs {
+                return true
+            } else {
+                return false
+            }
         }
     }
     
@@ -481,11 +508,19 @@ enum UIChatListEntry : Identifiable, Comparable {
         case .birthdays:
             return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteUpperBound().globalSuccessor())
         case .custom:
-            return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteUpperBound().globalSuccessor())
+            // Sort just before .space so "Show all" banner appears at the bottom of
+            // visible content, above the empty-height spacer row.
+            return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteUpperBound().globalPredecessor())
         case .grace:
             return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteUpperBound().globalSuccessor())
         case .loading:
             return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteUpperBound().globalPredecessor())
+        case .sectionHeader:
+            return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteUpperBound())
+        case .storiesRail:
+            return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteLowerBound().globalSuccessor())
+        case .storiesEmpty:
+            return ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex.absoluteLowerBound().globalSuccessor().globalSuccessor())
         }
     }
     
@@ -523,6 +558,12 @@ enum UIChatListEntry : Identifiable, Comparable {
             return .grace
         case .space:
             return .space
+        case .sectionHeader(let title):
+            return .sectionHeader(title)
+        case .storiesRail:
+            return .storiesRail
+        case .storiesEmpty:
+            return .storiesEmpty
         }
     }
     
@@ -530,9 +571,27 @@ enum UIChatListEntry : Identifiable, Comparable {
 
 
 
-fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?, to:[AppearanceWrapperEntry<UIChatListEntry>], adIndex: UInt16?, arguments: Arguments, initialSize:NSSize, animated:Bool, scrollState:TableScrollState? = nil, groupId: EngineChatList.Group, listMode: PeerListMode) -> Signal<TableUpdateTransition, NoError> {
+fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?, to:[AppearanceWrapperEntry<UIChatListEntry>], adIndex: UInt16?, arguments: Arguments, initialSize:NSSize, animated:Bool, scrollState:TableScrollState? = nil, groupId: EngineChatList.Group, listMode: PeerListMode, activeCategory: FocusCategory = .inbox) -> Signal<TableUpdateTransition, NoError> {
     
     return Signal { subscriber in
+        
+        let includeChatListEntry: (AppearanceWrapperEntry<UIChatListEntry>) -> Bool = { wrapped in
+            switch wrapped.entry {
+            case .sectionHeader:
+                // Section headers are obsolete with the category strip.
+                return false
+            case .custom:
+                // Re-enabled for the focus fork's show-all action banner.
+                return true
+            case .space:
+                // Avoid rendering a lone spacer when no content rows are visible.
+                return activeCategory != .settings
+            default:
+                return true
+            }
+        }
+        let effectiveFrom = from?.filter(includeChatListEntry)
+        let effectiveTo = to.filter(includeChatListEntry)
                 
         func makeItem(_ entry: AppearanceWrapperEntry<UIChatListEntry>) -> TableRowItem {
             switch entry.entry {
@@ -591,11 +650,29 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?,
                 return ChatListSpaceItem(initialSize, stableId: entry.stableId, getState: arguments.getState, getDeltaProgress: arguments.getDeltaProgress, getInterfaceState: arguments.getStoryInterfaceState, getNavigationHeight: arguments.getNavigationHeight) 
             case let .custom(action):
                 return ChatListTextActionRowItem(initialSize, stableId: entry.stableId, context: arguments.context, title: action.text, info: action.info, canDismiss: action.canDismiss, action: action.action, dismiss: action.dismiss)
+            case let .sectionHeader(title):
+                return ChatListSectionHeaderItem(initialSize, stableId: entry.stableId, title: title)
+            case let .storiesRail(subscriptions):
+                return ChatListStoriesRailRowItem(
+                    initialSize,
+                    stableId: entry.stableId,
+                    context: arguments.context,
+                    subscriptions: subscriptions,
+                    openStory: arguments.openStory,
+                    revealStoriesState: arguments.revealStoriesState
+                )
+            case .storiesEmpty:
+                return SearchEmptyRowItem(
+                    initialSize,
+                    stableId: entry.stableId,
+                    header: "No stories yet",
+                    text: "Stories from people and channels you follow will appear here."
+                )
             }
         }
         
         
-        let (deleted,inserted,updated) = proccessEntries(from, right: to, { entry -> TableRowItem in
+        let (deleted,inserted,updated) = proccessEntries(effectiveFrom, right: effectiveTo, { entry -> TableRowItem in
             return makeItem(entry)
         })
         
@@ -659,7 +736,7 @@ struct FilterData : Equatable {
     let badges: ChatListFilterBadges
     let requestTimestamp: TimeInterval
     var isTop: Bool
-    init(filter: ChatListFilter = .allChats, tabs: [ChatListFilter] = [], sidebar: Bool = false, showTags: Bool = false, request: ChatListIndexRequest = .Initial(50, nil), badges: ChatListFilterBadges = .init(total: 0, filters: []), requestTimestamp: TimeInterval = CACurrentMediaTime(), isTop: Bool = true) {
+    init(filter: ChatListFilter = .allChats, tabs: [ChatListFilter] = [], sidebar: Bool = false, showTags: Bool = false, request: ChatListIndexRequest = .Initial(300, nil), badges: ChatListFilterBadges = .init(total: 0, filters: []), requestTimestamp: TimeInterval = CACurrentMediaTime(), isTop: Bool = true) {
         self.filter = filter
         self.tabs = tabs
         self.sidebar = sidebar
@@ -707,8 +784,111 @@ struct FilterData : Equatable {
 }
 
 
+// MARK: - UIShowAllAction (Focus fork)
+// Injected as a .custom entry at the bottom of unread-filtered lists so the user
+// can momentarily reveal all chats/channels without switching categories.
+struct UIShowAllAction: UIChatListTextAction {
+    let text: NSAttributedString
+    let info: NSAttributedString
+    let canDismiss: Bool = false
+    private let _action: () -> Void
+
+    init(category: FocusCategory) {
+        switch category {
+        case .channels:
+            text = .initialize(string: "Show all channels", color: theme.colors.accent, font: .medium(.text))
+        default:
+            text = .initialize(string: "Show all conversations", color: theme.colors.accent, font: .medium(.text))
+        }
+        info = .initialize(string: "", color: .clear, font: .normal(1))
+        _action = {}
+    }
+
+    func action() { _action() }
+    func dismiss() {}
+
+    func isEqual(_ rhs: any UIChatListTextAction) -> Bool {
+        rhs is UIShowAllAction
+    }
+}
+
+// Variant that holds a real callback (used when the action is actually triggered).
+struct UIShowAllActionLive: UIChatListTextAction {
+    let text: NSAttributedString
+    let info: NSAttributedString
+    let canDismiss: Bool = false
+    private let _action: () -> Void
+
+    init(category: FocusCategory, onShowAll: @escaping () -> Void) {
+        switch category {
+        case .channels:
+            text = .initialize(string: "Show all channels →", color: theme.colors.accent, font: .medium(.text))
+        default:
+            text = .initialize(string: "Show all conversations →", color: theme.colors.accent, font: .medium(.text))
+        }
+        info = .initialize(string: "", color: .clear, font: .normal(1))
+        _action = onShowAll
+    }
+
+    func action() { _action() }
+    func dismiss() {}
+
+    func isEqual(_ rhs: any UIChatListTextAction) -> Bool {
+        rhs is UIShowAllActionLive
+    }
+}
+
+
 class ChatListController : PeersListController {
-    
+
+    // Focus fork: active category drives list filtering.
+    var activeCategory: FocusCategory = .inbox {
+        didSet {
+            if oldValue != activeCategory {
+                activeCategoryDidChange()
+            }
+        }
+    }
+
+    private let activeCategoryPromise: ValuePromise<FocusCategory> = ValuePromise(.inbox, ignoreRepeated: true)
+    var activeCategorySignal: Signal<FocusCategory, NoError> { return activeCategoryPromise.get() }
+
+    // Thread-safe atomic mirror of activeCategory for use in background prepare queues.
+    private let activeCategoryAtomic: Atomic<FocusCategory> = Atomic(value: .inbox)
+
+    // Focus fork: whether the current category is showing all chats (not just unread).
+    // This is ephemeral — resets to false when the active category changes.
+    private var _showAll: Bool = false
+    private let showAllAtomic: Atomic<Bool> = Atomic(value: false)
+
+    var showAll: Bool {
+        get { _showAll }
+        set {
+            guard _showAll != newValue else { return }
+            _showAll = newValue
+            _ = showAllAtomic.swap(newValue)
+            updateFilter { $0.withUpdatedRequest(.Initial(1000, nil), removeAnimation: false).withUpdatedIsTop(false) }
+        }
+    }
+
+    private func activeCategoryDidChange() {
+        // Reset show-all mode without triggering an extra updateFilter call —
+        // the explicit call below handles the reload.
+        _showAll = false
+        _ = showAllAtomic.swap(false)
+        _ = activeCategoryAtomic.swap(activeCategory)
+        activeCategoryPromise.set(activeCategory)
+        // Scroll back to top when category changes.
+        DispatchQueue.main.async { [weak self] in
+            self?.genericView.tableView.scroll(to: .up(true))
+        }
+        // Request a very large initial batch. The client-side inbox filter strips
+        // all broadcast channels, so accounts with 500+ channels in recent history
+        // still need up to ~1000 raw items to surface enough non-channel rows to
+        // fill the viewport. Local SQLite reads at this count are still <50 ms.
+        updateFilter { $0.withUpdatedRequest(.Initial(1000, nil), removeAnimation: true).withUpdatedIsTop(true) }
+    }
+
     private let folderUpdatesDisposable = MetaDisposable()
 
     func updateFilter(_ f:(FilterData)->FilterData) {
@@ -762,6 +942,7 @@ class ChatListController : PeersListController {
     private let suggestAutoarchiveDisposable = MetaDisposable()
     
     private var didSuggestAutoarchive: Bool = false
+    private var didForceInitialAppearRequest: Bool = false
     
     private var preloadStorySubscriptionsDisposable: Disposable?
     private var preloadStoryResourceDisposables: [MediaId: Disposable] = [:]
@@ -922,9 +1103,9 @@ class ChatListController : PeersListController {
 
         
         let chatHistoryView: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?), NoError> = filterSignal |> mapToSignal { data in
-            
-            let signal = combineLatest(context.engine.peers.subscribedChatFolderUpdates(folderId: data.filter.id), chatListViewForLocation(chatListLocation: mode.location, location: data.request, filter: data.filter, account: context.account))
-            return  signal |> map { updates, view in
+            let folderUpdatesSignal = (.single(nil) |> then(context.engine.peers.subscribedChatFolderUpdates(folderId: data.filter.id)))
+            let signal = combineLatest(folderUpdatesSignal, chatListViewForLocation(chatListLocation: mode.location, location: data.request, filter: data.filter, account: context.account))
+            return signal |> map { updates, view in
                 return (view, data, false, updates)
             }
         }
@@ -933,19 +1114,23 @@ class ChatListController : PeersListController {
 
         
         let storyState: Signal<EngineStorySubscriptions?, NoError>
+        /// Matches main inbox / PeersList (plain): visible story subscriptions. Used for Focus “Stories” tab filtering.
+        let storyStateVisible: Signal<EngineStorySubscriptions?, NoError>
         if self.mode.groupId == .root {
             storyState = context.engine.messages.storySubscriptions(isHidden: true) |> map(Optional.init)
+            storyStateVisible = context.engine.messages.storySubscriptions(isHidden: false) |> map(Optional.init)
         } else {
             storyState = .single(nil)
+            storyStateVisible = .single(nil)
         }
         
-        let suspiciousSession: Signal<[NewSessionReview], NoError> = newSessionReviews(postbox: context.account.postbox)
+        let suspiciousSession: Signal<[NewSessionReview], NoError> = .single([]) |> then(newSessionReviews(postbox: context.account.postbox))
 
         let previousLayout: Atomic<SplitViewState> = Atomic(value: context.layout)
                 
         
-        let suggestions = context.engine.notices.getServerProvidedSuggestions()
-        let birthdays: Signal<[UIChatListBirthday], NoError> = combineLatest(context.engine.notices.getServerDismissedSuggestions(), context.account.stateManager.contactBirthdays) |> map { dismissed, list in
+        let suggestions = .single([ServerProvidedSuggestion]()) |> then(context.engine.notices.getServerProvidedSuggestions())
+        let birthdays: Signal<[UIChatListBirthday], NoError> = (.single([]) |> then(combineLatest(context.engine.notices.getServerDismissedSuggestions(), context.account.stateManager.contactBirthdays) |> map { dismissed, list in
             return (list.filter {
                 $0.value.isToday
             }, dismissed)
@@ -961,25 +1146,44 @@ class ChatListController : PeersListController {
                 }
                 return birthdays
             }
-        }
+        }))
         
-        let myBirthday = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Birthday(id: context.peerId))
+        let myBirthday = .single(nil) |> then(context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Birthday(id: context.peerId)))
         
         let subState: Signal<StarsSubscriptionsContext.State?, NoError>
         if let subContext {
-            subState = subContext.state |> map(Optional.init)
+            // Ensure combineLatest can emit on cold start even before stars
+            // subscriptions context produces its first state.
+            subState = .single(nil) |> then(subContext.state |> map(Optional.init))
         } else {
             subState = .single(nil)
         }
         
         
-        let appConfiguration = context.account.postbox.preferencesView(keys: [PreferencesKeys.appConfiguration]) |> map { view in
+        let appConfiguration = (.single(AppConfiguration.defaultValue) |> then(context.account.postbox.preferencesView(keys: [PreferencesKeys.appConfiguration]) |> map { view in
             return view.values[PreferencesKeys.appConfiguration]?.get(AppConfiguration.self) ?? AppConfiguration.defaultValue
-        }
+        }))
         
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, stateUpdater, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), chatListFilterItems(engine: context.engine, accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, context.starsContext.state, subState, appConfiguration) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, filtersCounter, storyState, suspiciousSession, suggestions, birthdays, myBirthday, starsSubscriptionsState, missingBalanceState, appConfiguration -> Signal<TableUpdateTransition, NoError> in
+        let inAppSettingsSignal = .single(InAppNotificationSettings.defaultSettings) |> then(appNotificationSettings(accountManager: context.sharedContext.accountManager))
+        let additionalSettingsSignal = .single(AdditionalSettings.defaultSettings) |> then(additionalSettings(accountManager: context.sharedContext.accountManager))
+        let filterBadgesSignal = .single(ChatListFilterBadges(total: 0, filters: [])) |> then(chatListFilterItems(engine: context.engine, accountManager: context.sharedContext.accountManager))
+        let storyStateSignal = .single(nil) |> then(storyState)
+        let storyStateVisibleSignal = .single(nil) |> then(storyStateVisible)
+        
+        // Capture atomics so the prepare-queue closure can read them without capturing self.
+        let activeCategoryRef = activeCategoryAtomic
+        let showAllRef = showAllAtomic
+
+        // Callback to trigger show-all from the background queue's injected custom action.
+        // Dispatches to main thread to safely mutate showAll.
+        let triggerShowAll: () -> Void = { [weak self] in
+            DispatchQueue.main.async { self?.showAll = true }
+        }
+
+        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, stateUpdater, inAppSettingsSignal, additionalSettingsSignal, filterBadgesSignal, storyStateSignal, storyStateVisibleSignal, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, filtersCounter, storyState, storyStateVisible, suspiciousSession, suggestions, birthdays, myBirthday, missingBalanceState, appConfiguration -> Signal<TableUpdateTransition, NoError> in
                                 
             let filterData = value.1
+            let currentCategory = activeCategoryRef.with { $0 }
             let folderUpdates = value.3
             let update = value.0
             let removeNextAnimation = update.removeNextAnimation
@@ -994,9 +1198,87 @@ class ChatListController : PeersListController {
             
 
             _ = previousChatList.swap(update.list)
+
+            // Focus Stories tab: rail-only UI (merged subscriptions), not a filtered chat list.
+            if currentCategory == .stories {
+                let mergedSubs = focusMergeEngineStorySubscriptions(visible: storyStateVisible, hidden: storyState)
+                let hasContent = focusMergedStorySubscriptionsHasContent(mergedSubs)
+                var mappedStories: [UIChatListEntry] = []
+                if !hasContent {
+                    if update.list.isLoading {
+                        mappedStories.append(.loading(filterData.filter))
+                    } else {
+                        mappedStories.append(.storiesEmpty)
+                    }
+                } else {
+                    mappedStories.append(.storiesRail(mergedSubs))
+                }
+                var animatedStories = animated.swap(true)
+                if value.2 {
+                    animatedStories = false
+                    scroll = .up(true)
+                }
+                if state.filterData.requestTimestamp + 2 > CACurrentMediaTime() {
+                    animatedStories = false
+                }
+                let layoutUpdatedStories = previousLayout.swap(context.layout) != context.layout
+                if layoutUpdatedStories {
+                    scroll = .up(false)
+                    animatedStories = false
+                }
+                mappedStories.append(.space)
+                let entriesStories = mappedStories.sorted().compactMap { entry -> AppearanceWrapperEntry<UIChatListEntry>? in
+                    AppearanceWrapperEntry(entry: entry, appearance: appearance)
+                }
+                return prepareEntries(from: previousEntries.swap(entriesStories), to: entriesStories, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animatedStories, scrollState: scroll, groupId: groupId, listMode: mode, activeCategory: currentCategory)
+            }
+
             var prepare:[(EngineChatList.Item, UIChatAdditionalItem?)] = []
             for value in update.list.items {
                 prepare.append((value, nil))
+            }
+
+            // Filter chats by active focus category before mapping so empty/loading
+            // placeholders are computed against what is actually visible.
+            // Archive/folder controllers load from a non-root group — show all items.
+            let currentShowAll = showAllRef.with { $0 }
+            prepare = prepare.filter { item, addition in
+                guard mode.groupId == .root else { return true }
+                if currentCategory == .settings {
+                    return false
+                }
+                guard let peer = item.renderedPeer.chatMainPeer?._asPeer() else {
+                    return true
+                }
+                let isChannel = peer.isChannel
+                let unreadCount = item.readCounters?.count ?? 0
+                let isUnreadMarked = item.readCounters?.markedUnread ?? false
+                let hasUnread = unreadCount > 0 || isUnreadMarked
+                switch currentCategory {
+                case .inbox:
+                    guard !isChannel else { return false }
+                    return currentShowAll || hasUnread
+                case .digest:
+                    return isChannel
+                case .channels:
+                    guard isChannel else { return false }
+                    return currentShowAll || hasUnread
+                case .archive:
+                    // Archived chats live in a separate DB group (.archive).
+                    // Items in the root list are not archived; exclude them all.
+                    // The "Archived Chats" group summary row is appended below.
+                    return false
+                case .saved:
+                    return false
+                case .contacts:
+                    return false
+                case .search:
+                    return false
+                case .stories:
+                    return false
+                case .settings:
+                    return false
+                }
             }
             
             let hiddenItems: PeerListHiddenItems = state.hiddenItems
@@ -1033,14 +1315,12 @@ class ChatListController : PeersListController {
                     } else {
                         hideStatus = hiddenItems.archive
                     }
-                    for (i, group) in update.list.groupItems.reversed().enumerated() {
-                        mapped.append(.group(i, group, animateGroupNextTransition.swap(nil) == group.id, hideStatus, state.controllerAppear, state.appear == .short, storyState))
-                    }
-                    if state.mode == .plain, state.filterData.filter == .allChats, !update.list.hasLater {
-                        if update.list.groupItems.isEmpty, let storyState = storyState, !storyState.items.isEmpty {
-                            mapped.append(.group(0, .init(id: .archive, topMessage: nil, items: [], unreadCount: 0), animateGroupNextTransition.swap(nil) == .archive, hideStatus, state.controllerAppear, state.appear == .short, storyState))
+                    if currentCategory == .archive {
+                        for (i, group) in update.list.groupItems.reversed().enumerated() {
+                            mapped.append(.group(i, group, animateGroupNextTransition.swap(nil) == group.id, hideStatus, state.controllerAppear, state.appear == .short, storyState))
                         }
                     }
+                    // Archive group fallback removed for focus fork (archive uses its own controller).
                 }
             }
             
@@ -1048,7 +1328,16 @@ class ChatListController : PeersListController {
             
             if mapped.isEmpty {
                 if !update.list.isLoading {
-                    mapped.append(.empty(filterData.filter, mode, state.splitState, .init(state.forumPeer?.peer)))
+                    if mode.groupId == .root, !currentShowAll {
+                        switch currentCategory {
+                        case .inbox, .channels:
+                            mapped.append(.custom(UIShowAllActionLive(category: currentCategory, onShowAll: triggerShowAll)))
+                        default:
+                            mapped.append(.empty(filterData.filter, mode, state.splitState, .init(state.forumPeer?.peer)))
+                        }
+                    } else {
+                        mapped.append(.empty(filterData.filter, mode, state.splitState, .init(state.forumPeer?.peer)))
+                    }
                 } else {
                     mapped.append(.loading(filterData.filter))
                 }
@@ -1115,10 +1404,25 @@ class ChatListController : PeersListController {
                 additionItems.append(.sharedFolderUpdated(updates))
             }
             
+            // Digest banner removed — channels are shown via the Digest category in the strip.
+            
             if let first = additionItems.first {
                 mapped.append(first)
             }
-            
+
+            // Inject "Show all" action at the bottom of unread-filtered categories
+            // when the list actually has content and show-all is not yet active.
+            if mode.groupId == .root, !currentShowAll, state.splitState != .minimisize {
+                switch currentCategory {
+                case .inbox, .channels:
+                    let hasChatRows = mapped.contains { if case .chat = $0 { return true } else { return false } }
+                    if hasChatRows {
+                        mapped.append(.custom(UIShowAllActionLive(category: currentCategory, onShowAll: triggerShowAll)))
+                    }
+                default:
+                    break
+                }
+            }
             
             var animated = animated.swap(true)
                         
@@ -1151,7 +1455,7 @@ class ChatListController : PeersListController {
                 bp += 1
             }
             
-            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode)
+            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode, activeCategory: activeCategoryRef.with { $0 })
         }
         
         
@@ -1162,9 +1466,7 @@ class ChatListController : PeersListController {
         }
         
         disposable.set(appliedTransition.start())
-      
-        
-        
+
         var pinnedCount: Int = 0
         self.genericView.tableView.enumerateItems { item -> Bool in
             guard let item = item as? ChatListRowItem, item.isFixedItem else {return false}
@@ -1298,9 +1600,10 @@ class ChatListController : PeersListController {
             filterDisposable.set(combineLatest(filterView, filterBadges).start(next: { [weak self] filters, badges in
                 self?.updateFilter( { current in
                     var current = current
-                    current = current.withUpdatedTabs(filters.list)
-                        .withUpdatedSidebar(filters.sidebar)
-                        .withUpdatedShowTags(filters.showTags)
+                    let tabs = FocusProduct.isEnabled ? [] : filters.list
+                    current = current.withUpdatedTabs(tabs)
+                        .withUpdatedSidebar(FocusProduct.isEnabled ? false : filters.sidebar)
+                        .withUpdatedShowTags(FocusProduct.isEnabled ? false : filters.showTags)
                     if !first, let updated = filters.list.first(where: { $0.id == current.filter.id }) {
                         current = current.withUpdatedFilter(updated)
                     } else {
@@ -1452,6 +1755,7 @@ class ChatListController : PeersListController {
         if self.isOnScreen {
             context.account.viewTracker.chatListPreloadItems.set(.single(preloadItems) |> delay(0.2, queue: prepareQueue))
         }
+
     }
     
     private func resortPinned(_ from: Int, _ to: Int) {
@@ -1658,6 +1962,14 @@ class ChatListController : PeersListController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
+        if !didForceInitialAppearRequest {
+            didForceInitialAppearRequest = true
+            let viewportHeight = max(self.genericView.frame.height, context.window.frame.height)
+            let initialCount = max(Int(viewportHeight / 70) + 3, 12)
+            updateFilter {
+                $0.withUpdatedRequest(.Initial(initialCount, nil), removeAnimation: true).withUpdatedIsTop(true)
+            }
+        }
         
         subContext?.load(force: true)
         
@@ -2018,7 +2330,7 @@ class ChatListController : PeersListController {
     }
     
     
-    init(_ context: AccountContext, modal:Bool = false, mode: PeerListMode = .plain) {
+    init(_ context: AccountContext, modal:Bool = false, mode: PeerListMode = .plain, alwaysShowSearch: Bool = false) {
         
         if mode == .plain {
             self.subContext = context.engine.payments.peerStarsSubscriptionsContext(starsContext: nil, missingBalance: true)
@@ -2034,7 +2346,7 @@ class ChatListController : PeersListController {
         default:
             searchOptions = [.messages, .chats]
         }
-        super.init(context, followGlobal: !modal, mode: mode, searchOptions: searchOptions)
+        super.init(context, followGlobal: !modal, mode: mode, searchOptions: searchOptions, alwaysShowSearch: alwaysShowSearch)
         
         if mode.filterId != nil {
             context.closeFolderFirst = true
@@ -2090,6 +2402,12 @@ class ChatListController : PeersListController {
             return false
         }
         if item is SuspiciousAuthRowItem {
+            return false
+        }
+        if item is ChatListStoriesRailRowItem {
+            return false
+        }
+        if item is SearchEmptyRowItem {
             return false
         }
         return true
@@ -2157,5 +2475,48 @@ class ChatListController : PeersListController {
         return true
     }
   
+}
+
+// MARK: - Focus Stories tab (rail-only merge)
+
+/// Merges visible (`isHidden: false`) and hidden (`isHidden: true`) story subscription lists.
+/// Telegram splits subscriptions by the peer's `storiesHidden` flag; merging avoids missing channel stories.
+fileprivate func focusMergeEngineStorySubscriptions(visible: EngineStorySubscriptions?, hidden: EngineStorySubscriptions?) -> EngineStorySubscriptions {
+    var itemsByPeer: [PeerId: EngineStorySubscriptions.Item] = [:]
+    for subs in [visible, hidden].compactMap({ $0 }) {
+        for it in subs.items where it.storyCount > 0 {
+            let id = it.peer.id
+            if let existing = itemsByPeer[id] {
+                if it.lastTimestamp > existing.lastTimestamp {
+                    itemsByPeer[id] = it
+                }
+            } else {
+                itemsByPeer[id] = it
+            }
+        }
+    }
+    let mergedItems = Array(itemsByPeer.values).sorted { $0.lastTimestamp > $1.lastTimestamp }
+
+    var accountItem: EngineStorySubscriptions.Item?
+    for subs in [visible, hidden].compactMap({ $0 }) {
+        guard let acc = subs.accountItem, acc.storyCount > 0 else { continue }
+        if let existing = accountItem {
+            if acc.storyCount > existing.storyCount || acc.lastTimestamp > existing.lastTimestamp {
+                accountItem = acc
+            }
+        } else {
+            accountItem = acc
+        }
+    }
+
+    let hasMore = visible?.hasMoreToken ?? hidden?.hasMoreToken
+    return EngineStorySubscriptions(accountItem: accountItem, items: mergedItems, hasMoreToken: hasMore)
+}
+
+fileprivate func focusMergedStorySubscriptionsHasContent(_ merged: EngineStorySubscriptions) -> Bool {
+    if let a = merged.accountItem, a.storyCount > 0 {
+        return true
+    }
+    return merged.items.contains(where: { $0.storyCount > 0 })
 }
 

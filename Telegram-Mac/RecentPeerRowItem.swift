@@ -158,6 +158,7 @@ class RecentPeerRowView : ShortPeerRowView {
     }
     
     override func updateMouse(animated: Bool) {
+        super.updateMouse(animated: animated)
         if mouseInside(), control.superview != nil {
             control.isHidden = false
             badgeView?.isHidden = true

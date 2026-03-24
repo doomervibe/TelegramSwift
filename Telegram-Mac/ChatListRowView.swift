@@ -11,6 +11,7 @@ import TGUIKit
 import SwiftSignalKit
 import TelegramCore
 import Postbox
+import InAppSettings
 import Accelerate
 import TelegramMedia
 
@@ -906,9 +907,17 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
     private var activitiesModel:ChatActivitiesModel?
     private var photoContainer = Control(frame: NSMakeRect(0, 0, 50, 50))
     private let photo: AvatarStoryControl = AvatarStoryControl(font: .avatar(22), size: NSMakeSize(50, 50))
+    private let photoGhost: View = View(frame: NSMakeRect(10, 10, 50, 50))
+    private var avatarRevealWorkItem: DispatchWorkItem?
+    private var isAvatarHoverActive: Bool = false
+    // Focus fork: slower reveal gives a more deliberate, contemplative feel.
+    private let avatarRevealDelay: TimeInterval = 1.4
+    private let avatarRevealDuration: CGFloat = 0.55
+    private let avatarHideDuration: CGFloat = 0.38
 
     private var photoVideoView: MediaPlayerView?
     private var photoVideoPlayer: MediaPlayer?
+    private var trackingAreaRef: NSTrackingArea?
     
     private var starBadgeView: ImageView?
     
@@ -1157,7 +1166,9 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                 let highlighted = self.highlighed
                 
                 if item.ctxBadgeNode == nil && item.mentionsCount == nil && (item.isPinned || item.isLastPinned) {
-                    ctx.draw(highlighted ? theme.icons.pinnedImageSelected : theme.icons.pinnedImage, in: NSMakeRect(frame.width - theme.icons.pinnedImage.backingSize.width - item.margin - 1, frame.height - theme.icons.pinnedImage.backingSize.height - (item.margin + 1), theme.icons.pinnedImage.backingSize.width, theme.icons.pinnedImage.backingSize.height))
+                    let pinAnchorRight: CGFloat = FocusProduct.isEnabled ? item.focusInboxDateTrailingX(contentWidth: contentView.frame.width) : frame.width
+                    let pinX = pinAnchorRight - theme.icons.pinnedImage.backingSize.width - item.margin - 1
+                    ctx.draw(highlighted ? theme.icons.pinnedImageSelected : theme.icons.pinnedImage, in: NSMakeRect(pinX, frame.height - theme.icons.pinnedImage.backingSize.height - (item.margin + 1), theme.icons.pinnedImage.backingSize.width, theme.icons.pinnedImage.backingSize.height))
                 }
                 
                 if let displayLayout = item.ctxDisplayLayout {
@@ -1195,7 +1206,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                     }
                     
                     if let dateLayout = item.ctxDateLayout, !item.hasDraft {
-                        let dateX = contentView.frame.width - dateLayout.layoutSize.width - item.margin
+                        let dateX = FocusProduct.isEnabled ? item.focusInboxDateOriginX(dateWidth: dateLayout.layoutSize.width, contentWidth: contentView.frame.width) : (contentView.frame.width - dateLayout.layoutSize.width - item.margin)
                         
                         if item.isClosedTopic {
                             let icon = theme.icons.chatlist_forum_closed_topic
@@ -1204,15 +1215,17 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                             ctx.draw(highlighted ? iconActive : icon, in: NSMakeRect(outX, item.margin + 2, icon.backingSize.width, icon.backingSize.height))
                         } else {
                             if !item.isFailed {
-                                if item.isSending {
-                                    let outX = dateX - theme.icons.sendingImage.backingSize.width - 4
-                                    ctx.draw(highlighted ? theme.icons.sendingImageSelected : theme.icons.sendingImage, in: NSMakeRect(outX,item.margin + 2, theme.icons.sendingImage.backingSize.width, theme.icons.sendingImage.backingSize.height))
-                                } else {
-                                    if item.isOutMessage {
-                                        let outX = dateX - theme.icons.outgoingMessageImage.backingSize.width - (item.isRead ? 4.0 : 0.0) - 2
-                                        ctx.draw(highlighted ? theme.icons.outgoingMessageImageSelected : theme.icons.outgoingMessageImage, in: NSMakeRect(outX, item.margin + 2, theme.icons.outgoingMessageImage.backingSize.width, theme.icons.outgoingMessageImage.backingSize.height))
-                                        if item.isRead {
-                                            ctx.draw(highlighted ? theme.icons.readMessageImageSelected : theme.icons.readMessageImage, in: NSMakeRect(outX + 4, item.margin + 2, theme.icons.readMessageImage.backingSize.width, theme.icons.readMessageImage.backingSize.height))
+                                if !FocusProduct.isEnabled {
+                                    if item.isSending {
+                                        let outX = dateX - theme.icons.sendingImage.backingSize.width - 4
+                                        ctx.draw(highlighted ? theme.icons.sendingImageSelected : theme.icons.sendingImage, in: NSMakeRect(outX,item.margin + 2, theme.icons.sendingImage.backingSize.width, theme.icons.sendingImage.backingSize.height))
+                                    } else {
+                                        if item.isOutMessage {
+                                            let outX = dateX - theme.icons.outgoingMessageImage.backingSize.width - (item.isRead ? 4.0 : 0.0) - 2
+                                            ctx.draw(highlighted ? theme.icons.outgoingMessageImageSelected : theme.icons.outgoingMessageImage, in: NSMakeRect(outX, item.margin + 2, theme.icons.outgoingMessageImage.backingSize.width, theme.icons.outgoingMessageImage.backingSize.height))
+                                            if item.isRead {
+                                                ctx.draw(highlighted ? theme.icons.readMessageImageSelected : theme.icons.readMessageImage, in: NSMakeRect(outX + 4, item.margin + 2, theme.icons.readMessageImage.backingSize.width, theme.icons.readMessageImage.backingSize.height))
+                                            }
                                         }
                                     }
                                 }
@@ -1242,6 +1255,11 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
         photo.frame = NSMakeRect(0, 0, 50, 50)
         photoContainer.frame = NSMakeRect(10, 10, 50, 50)
         photoContainer.addSubview(photo)
+        photoGhost.wantsLayer = true
+        photoGhost.layer?.cornerRadius = 25
+        photoGhost.backgroundColor = NSColor(white: 0.88, alpha: 1.0)
+        photoGhost.isHidden = true
+        containerView.addSubview(photoGhost)
         containerView.addSubview(photoContainer)
 
         
@@ -1270,6 +1288,20 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
         
     }
     
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingAreaRef {
+            removeTrackingArea(trackingAreaRef)
+        }
+        trackingAreaRef = nil
+        if window != nil {
+            let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect]
+            let area = NSTrackingArea(rect: .zero, options: options, owner: self, userInfo: nil)
+            addTrackingArea(area)
+            trackingAreaRef = area
+        }
+    }
+    
     func takeStoryControl() -> NSView? {
         return self.photo
     }
@@ -1287,6 +1319,25 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
         super.mouseDown(with: event)
     }
     
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        isAvatarHoverActive = true
+        updateMouse(animated: true)
+    }
+    
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        isAvatarHoverActive = bounds.contains(point)
+        updateMouse(animated: true)
+    }
+    
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        isAvatarHoverActive = false
+        updateMouse(animated: true)
+    }
+    
     override public func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         needsDisplay = true
         updateColors()
@@ -1302,6 +1353,66 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
     public override func draggingEnded(_ sender: NSDraggingInfo) {
         needsDisplay = true
         updateColors()
+    }
+    
+    // All non-archive Focus rows use delayed hover reveal with a ghost placeholder.
+    private var shouldHoverRevealAvatar: Bool {
+        guard let item = item as? ChatListRowItem else { return false }
+        return FocusProduct.isEnabled && !item.isArchiveItem
+    }
+    
+    private func cancelAvatarReveal() {
+        avatarRevealWorkItem?.cancel()
+        avatarRevealWorkItem = nil
+    }
+    
+    // Directly sets avatar + ghost to a mutually exclusive state. Never both visible.
+    private func applyAvatarState(avatarVisible: Bool, animated: Bool, duration: CGFloat) {
+        let avatarTarget: Float = avatarVisible ? 1.0 : 0.0
+        let ghostTarget:  Float = avatarVisible ? 0.0 : 1.0
+        let avatarCurrent = photoContainer.layer?.opacity ?? 0
+        let ghostCurrent  = photoGhost.layer?.opacity  ?? 0
+
+        photoContainer.isHidden = false
+        photoGhost.isHidden = false
+        photoGhost.frame = photoContainer.frame
+
+        if animated {
+            if abs(avatarCurrent - avatarTarget) > 0.01 {
+                photoContainer.layer?.animateAlpha(from: CGFloat(avatarCurrent), to: CGFloat(avatarTarget), duration: duration)
+            }
+            if abs(ghostCurrent - ghostTarget) > 0.01 {
+                photoGhost.layer?.animateAlpha(from: CGFloat(ghostCurrent), to: CGFloat(ghostTarget), duration: duration)
+            }
+        }
+        photoContainer.layer?.opacity = avatarTarget
+        photoGhost.layer?.opacity     = ghostTarget
+    }
+    
+    private func resetHoverAvatarStateForReuse() {
+        cancelAvatarReveal()
+        isAvatarHoverActive = false
+        photoContainer.isHidden = true
+        photoContainer.layer?.opacity = 0.0
+        photoGhost.isHidden = true
+        photoGhost.layer?.opacity = 0.0
+        activeImage?.isHidden = true
+        groupActivityView?.isHidden = true
+    }
+    
+    private func updateHoverAvatarVisibility(animated: Bool, applyDelay: Bool) {
+        cancelAvatarReveal()
+        photoContainer.isHidden = true
+        photoContainer.layer?.opacity = 0.0
+        photoGhost.isHidden = true
+        photoGhost.layer?.opacity = 0.0
+        activeImage?.isHidden = true
+        groupActivityView?.isHidden = true
+    }
+
+    override func updateMouse(animated: Bool) {
+        super.updateMouse(animated: animated)
+        updateHoverAvatarVisibility(animated: animated, applyDelay: true)
     }
 
     override func updateColors() {
@@ -1429,6 +1540,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
         
                 
          if let item = item as? ChatListRowItem {
+             resetHoverAvatarStateForReuse()
              
              let animated = animated && previous?.splitState == item.splitState
                           
@@ -1526,7 +1638,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
              
              let peer = item.renderedPeer?.chatOrMonoforumMainPeer?._asPeer() ?? item.peer
              
-             if let peer = peer, peer.id != item.context.peerId, !item.isTopic {
+             if let peer = peer, peer.id != item.context.peerId, !item.isTopic, !FocusProduct.isEnabled {
                  let highlighted = self.highlighed
                  let control = PremiumStatusControl.control(peer, account: item.context.account, inlinePacksContext: item.context.inlinePacksContext, left: false, isSelected: highlighted, cached: self.statusControl, animated: animated)
                  if let control = control {
@@ -1541,7 +1653,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                  self.statusControl = nil
              }
              
-             if let peer = peer, peer.id != item.context.peerId, !item.isTopic {
+             if let peer = peer, peer.id != item.context.peerId, !item.isTopic, !FocusProduct.isEnabled {
                  let highlighted = self.highlighed
                  let control = PremiumStatusControl.control(peer, account: item.context.account, inlinePacksContext: item.context.inlinePacksContext, left: true, isSelected: highlighted, cached: self.leftStatusControl, animated: animated)
                  if let control = control {
@@ -1556,7 +1668,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                  self.leftStatusControl = nil
              }
              
-             if item.isReplyToStory, !hiddenMessage {
+             if item.isReplyToStory, !hiddenMessage, !FocusProduct.isEnabled {
                  let current: ImageView
                  if let view = self.storyReplyImageView {
                      current = view
@@ -1853,6 +1965,11 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                 photo.setState(account: item.context.account, state: .Empty)
                 photo.setSignal(generateEmptyPhoto(photo.frame.size, type: .icon(colors: theme.colors.peerColors(5), icon: icon, iconSize: icon.backingSize.aspectFitted(NSMakeSize(photo.frame.size.width - 22, photo.frame.size.height - 22)), cornerRadius: nil), bubble: false) |> map {($0, false)})
             } else if case .ArchivedChats = item.photo {
+                if FocusProduct.isEnabled {
+                    self.archivedPhoto?.removeFromSuperview()
+                    self.archivedPhoto = nil
+                    photo.setState(account: item.context.account, state: .Empty)
+                } else {
                 if self.archivedPhoto == nil {
                     self.archivedPhoto = LAnimationButton(animation: "archiveAvatar", size: NSMakeSize(46, 46), offset: NSMakeSize(0, 0))
                     photoContainer.addSubview(self.archivedPhoto!, positioned: .above, relativeTo: self.photo)
@@ -1871,6 +1988,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                 }
                 self.archivedPhoto?.layer?.cornerRadius = photo.radius
                 photo.setState(account: item.context.account, state: .Empty)
+                }
             } else {
                 self.archivedPhoto?.removeFromSuperview()
                 self.archivedPhoto = nil
@@ -2098,7 +2216,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                  self.mentionsView = nil
              }
              
-             if let _ = item.reactionsCount {
+             if let _ = item.reactionsCount, !FocusProduct.isEnabled {
                  
                  let highlighted = self.highlighed
                  let icon: CGImage
@@ -2828,6 +2946,10 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
     }
     
     deinit {
+        if let trackingAreaRef {
+            removeTrackingArea(trackingAreaRef)
+        }
+        cancelAvatarReveal()
         peerInputActivitiesDisposable.dispose()
     }
     
@@ -2858,11 +2980,45 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
         }
         return .zero
     }
+    
+    private func focusMetadataY(_ item: ChatListRowItem) -> CGFloat {
+        let titleHeight = max(displayNameView?.frame.height ?? 0.0, 16.0)
+        return titleHeight + item.margin + 1
+    }
+    
+    private func focusMetadataDateX(_ item: ChatListRowItem) -> CGFloat {
+        return item.leftInset
+    }
+    
+    private func focusMetadataBadgeX(_ item: ChatListRowItem) -> CGFloat {
+        let dateWidth = dateTextView?.frame.width ?? item.ctxDateLayout?.layoutSize.width ?? 0.0
+        return item.leftInset + (dateWidth > 0 ? dateWidth + 6.0 : 0.0)
+    }
+    
+    private func focusMetadataMaxX(_ item: ChatListRowItem) -> CGFloat {
+        var maxX = item.leftInset
+        if let dateTextView = self.dateTextView {
+            maxX = max(maxX, focusMetadataDateX(item) + dateTextView.frame.width)
+        }
+        if let badgeView = self.badgeView {
+            maxX = max(maxX, focusMetadataBadgeX(item) + badgeView.frame.width)
+        }
+        return maxX
+    }
+    
     func badgePoint(_ item: ChatListRowItem) -> NSPoint {
         if let badgeView = badgeView {
             let point: NSPoint
-            let y = self.containerView.frame.height - badgeView.frame.height - (item.margin + 1)
-            point = NSMakePoint(self.containerView.frame.width - badgeView.frame.width - item.margin, y)
+            let y: CGFloat
+            let x: CGFloat
+            if FocusProduct.isEnabled {
+                y = focusMetadataY(item)
+                x = focusMetadataBadgeX(item)
+            } else {
+                y = self.containerView.frame.height - badgeView.frame.height - (item.margin + 1)
+                x = self.containerView.frame.width - badgeView.frame.width - item.margin
+            }
+            point = NSMakePoint(x, y)
             return point
         }
         return .zero
@@ -2884,11 +3040,13 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
     }
     
     func mentionPoint(_ item: ChatListRowItem) -> NSPoint {
-        let point = NSMakePoint(self.contentView.frame.width - (item.ctxBadgeNode != nil ? item.ctxBadgeNode!.size.width + item.margin : 0) - 20 - item.margin, self.contentView.frame.height - 20 - (item.margin + 1))
+        let anchorRight = FocusProduct.isEnabled ? item.focusInboxDateTrailingX(contentWidth: self.contentView.frame.width) : self.contentView.frame.width
+        let point = NSMakePoint(anchorRight - (item.ctxBadgeNode != nil ? item.ctxBadgeNode!.size.width + item.margin : 0) - 20 - item.margin, self.contentView.frame.height - 20 - (item.margin + 1))
         return point
     }
     func reactionsPoint(_ item: ChatListRowItem) -> NSPoint {
-        let point = NSMakePoint(self.contentView.frame.width - (item.ctxBadgeNode != nil ? item.ctxBadgeNode!.size.width + item.margin : 0) - 20 - item.margin - (item.mentionsCount != nil ? 20 + item.margin : 0), self.contentView.frame.height - 20 - (item.margin + 1))
+        let anchorRight = FocusProduct.isEnabled ? item.focusInboxDateTrailingX(contentWidth: self.contentView.frame.width) : self.contentView.frame.width
+        let point = NSMakePoint(anchorRight - (item.ctxBadgeNode != nil ? item.ctxBadgeNode!.size.width + item.margin : 0) - 20 - item.margin - (item.mentionsCount != nil ? 20 + item.margin : 0), self.contentView.frame.height - 20 - (item.margin + 1))
         
         return point
     }
@@ -2983,8 +3141,9 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
            
             
             if let dateTextView = self.dateTextView {
-                let dateX = contentView.frame.width - dateTextView.frame.width - item.margin
-                dateTextView.setFrameOrigin(NSMakePoint(dateX, item.margin))
+                let dateX = FocusProduct.isEnabled ? focusMetadataDateX(item) : (contentView.frame.width - dateTextView.frame.width - item.margin)
+                let dateY = FocusProduct.isEnabled ? focusMetadataY(item) : item.margin
+                dateTextView.setFrameOrigin(NSMakePoint(dateX, dateY))
             }
             
             
@@ -3041,6 +3200,9 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
             
             var mediaPreviewOffset = NSMakePoint(inset, displayNameView.frame.height + item.margin + 2 + offset)
             let contentImageSpacing: CGFloat = 2.0
+            if FocusProduct.isEnabled, self.dateTextView != nil || self.badgeView != nil {
+                mediaPreviewOffset.x = max(mediaPreviewOffset.x, focusMetadataMaxX(item) + 8.0)
+            }
             
             if tagsView != nil {
                 if let chatNameTextView = chatNameTextView {
@@ -3085,15 +3247,27 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
             
             
             if let messageTextView = messageTextView {
+                let metadataMinX: CGFloat
+                if FocusProduct.isEnabled, self.dateTextView != nil || self.badgeView != nil {
+                    metadataMinX = focusMetadataMaxX(item) + 8.0
+                } else {
+                    metadataMinX = item.leftInset
+                }
                 if tagsView == nil || chatNameTextView == nil {
-                    messageTextView.setFrameOrigin(NSMakePoint(item.leftInset, displayHeight + item.margin + 1 + messageOffset))
+                    messageTextView.setFrameOrigin(NSMakePoint(metadataMinX, displayHeight + item.margin + 1 + messageOffset))
                 } else if let chatNameTextView = chatNameTextView {
                     let maxX = [chatNameTextView, forumTopicTextView].compactMap { $0 }.map { $0.frame.maxX + 3 }.max()
                     if let maxX = maxX {
-                        messageTextView.setFrameOrigin(NSMakePoint(maxX, chatNameTextView.frame.minY))
+                        messageTextView.setFrameOrigin(NSMakePoint(max(maxX, metadataMinX), chatNameTextView.frame.minY))
                     }
                 }
             }
+        }
+        
+        if self.displayNameView == nil, let dateTextView = self.dateTextView {
+            let dateX = FocusProduct.isEnabled ? focusMetadataDateX(item) : (contentView.frame.width - dateTextView.frame.width - item.margin)
+            let dateY = FocusProduct.isEnabled ? focusMetadataY(item) : item.margin
+            dateTextView.setFrameOrigin(NSMakePoint(dateX, dateY))
         }
         
         if let tagsView = tagsView {
@@ -3107,7 +3281,8 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                 offset += theme.icons.pinnedImage.systemSize.width + 5
             }
             
-            openMiniApp.setFrameOrigin(NSMakePoint(frame.width - openMiniApp.frame.width - offset, frame.height - openMiniApp.frame.height - (item.margin + 1)))
+            let anchorRight = FocusProduct.isEnabled ? item.focusInboxDateTrailingX(contentWidth: contentView.frame.width) : frame.width
+            openMiniApp.setFrameOrigin(NSMakePoint(anchorRight - openMiniApp.frame.width - offset, frame.height - openMiniApp.frame.height - (item.margin + 1)))
         }
         
         if let delta = internalDelta {

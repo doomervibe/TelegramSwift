@@ -11,6 +11,11 @@ import Postbox
 import SwiftSignalKit
 import TelegramCore
 
+/// Focus-first product fork: distraction-free UX is always on (no user toggle).
+public enum FocusProduct {
+    public static let isEnabled: Bool = true
+}
+
 public enum LiteModeKey : String {
     case any
     case emoji_effects
@@ -64,7 +69,8 @@ public struct LiteMode : Codable, Equatable {
     public var keys: [LiteModeKey]
     
     public static var standart: LiteMode {
-        return .init(enabled: false, lowBatteryPercent: 100, keys: LiteMode.allKeys)
+        // Focus fork: master lite mode on so animations/stickers/video are suppressed by default.
+        return .init(enabled: FocusProduct.isEnabled, lowBatteryPercent: 100, keys: LiteMode.allKeys)
     }
     
     public func isEnabled(key: LiteModeKey) -> Bool {

@@ -146,7 +146,7 @@ struct PeerListState : Equatable {
         var title: String {
             switch self {
             case .chats:
-                return strings().chatListChatsTag
+                return FocusProduct.isEnabled ? "Conversations" : strings().chatListChatsTag
             case .downloads:
                 return strings().chatListDownloadsTag
             case .channels:
@@ -844,13 +844,13 @@ fileprivate final class TitleView : Control {
             case .contacts:
                 return strings().peerListTitleContacts
             case .chats:
-                return strings().peerListTitleChats
+                return FocusProduct.isEnabled ? "Inbox" : strings().peerListTitleChats
             case .archivedChats:
-                return strings().peerListTitleArchive
+                return FocusProduct.isEnabled ? "Archive" : strings().peerListTitleArchive
             case .forum:
                 return strings().peerListTitleForum
             case .savedMessages:
-                return strings().peerListTitleSavedMessages
+                return FocusProduct.isEnabled ? "Notes" : strings().peerListTitleSavedMessages
             }
         }
     }
@@ -872,6 +872,8 @@ fileprivate final class TitleView : Control {
         super.updateLocalizationAndTheme(theme: theme)
     }
         
+    var focusCategoryOverride: String?
+
     fileprivate func updateState(_ state: PeerListState, arguments: Arguments, maxWidth: CGFloat, animated: Bool) {
                 
         let source: Source
@@ -887,7 +889,9 @@ fileprivate final class TitleView : Control {
             source = .chats
         }
         let text: String
-        if state.mode.isForum {
+        if let override = focusCategoryOverride, FocusProduct.isEnabled {
+            text = override
+        } else if state.mode.isForum {
             text = state.forumPeer?.peer.title ?? source.text
         } else {
             text = source.text
@@ -896,7 +900,7 @@ fileprivate final class TitleView : Control {
         layout.measure(width: maxWidth)
         textView.update(layout)
         
-        let hasStatus = state.peer?.peer.isPremium ?? false && state.mode == .plain && source != .contacts
+        let hasStatus = !FocusProduct.isEnabled && (state.peer?.peer.isPremium ?? false) && state.mode == .plain && source != .contacts
 
         if hasStatus, let peer = state.peer?.peer {
             
@@ -1066,6 +1070,9 @@ class PeerListContainerView : Control {
     
     fileprivate let titleView = TitleView(frame: .zero)
     
+    var focusCategoryOverride: String?
+    var focusAlwaysShowSearch: Bool = false
+    
     private var webapps: WebappsControl?
         
     
@@ -1157,13 +1164,13 @@ class PeerListContainerView : Control {
         
         self.mode = state.mode
         
-        if let stories = state.stories, state.hasStories {
+        if let stories = state.stories, state.hasStories, !FocusProduct.isEnabled {
             self.storiesItem = .init(frame.size, stableId: 0, context: arguments.context, isArchive: state.mode.groupId == .archive, state: stories, open: arguments.openStory, getInterfaceState: arguments.getStoryInterfaceState, reveal: arguments.revealStoriesState)
         } else {
             self.storiesItem = nil
         }
         
-        if !state.filterData.isEmpty && !state.filterData.sidebar, state.splitState != .minimisize, state.mode == .plain {
+        if !FocusProduct.isEnabled, !state.filterData.isEmpty && !state.filterData.sidebar, state.splitState != .minimisize, state.mode == .plain {
             self.foldersItem = .init(frame.size, context: arguments.context, tabs: state.filterData.tabs, selected: state.filterData.filter, counters: state.filterData.badges, action: arguments.setupFilter, openSettings: {
                 arguments.openFilterSettings(.allChats)
             }, menuItems: arguments.tabsMenuItems, getCurrentStoriesState: { [weak self] in
@@ -1323,7 +1330,7 @@ class PeerListContainerView : Control {
 //        }
 //        self.searchView.updateTags(tags, theme.search.searchImage)
         
-        if state.mode.groupId == .archive || (state.selectedForum != nil && state.splitState != .minimisize) || state.mode.isForumLike  || state.appear == .short {
+        if (state.selectedForum != nil && state.splitState != .minimisize) || state.mode.isForumLike  || state.appear == .short {
             let current: ImageButton
             if let view = self.backButton {
                 current = view
@@ -1684,6 +1691,7 @@ class PeerListContainerView : Control {
             maxTitleWidth -= proxy.frame.width
         }
         
+        self.titleView.focusCategoryOverride = self.focusCategoryOverride
         self.titleView.updateState(state, arguments: arguments, maxWidth: maxTitleWidth, animated: transition.isAnimated)
         
         var offset: CGFloat = navigationHeight
@@ -1727,8 +1735,10 @@ class PeerListContainerView : Control {
         
         var bottomInset: CGFloat = 0
         
+        let focusHideSearch = FocusProduct.isEnabled && state.searchState != .Focus && !state.isContacts && !focusAlwaysShowSearch
         transition.updateFrame(view: searchView, frame: searchRect)
         searchView.updateLayout(size: searchRect.size, transition: transition)
+        searchView.isHidden = focusHideSearch
         
 
 
@@ -1771,7 +1781,7 @@ class PeerListContainerView : Control {
             } else {
                 let rect = NSMakeRect(10, 10, 40, searchRect.height)
                 transition.updateFrame(view: view, frame: rect)
-                if state.mode.groupId == .archive || state.mode.isSavedMessages {
+                if state.mode.isSavedMessages {
                     transition.updateAlpha(view: view, alpha: 1)
                 } else {
                     transition.updateAlpha(view: view, alpha: 1 - progress)
@@ -1871,12 +1881,10 @@ class PeerListContainerView : Control {
         }
         var offset: CGFloat = 50
         
-        
-        
         if state.splitState != .minimisize, state.mode.isPlain {
-
-            offset += 40
-
+            if !FocusProduct.isEnabled || state.searchState == .Focus || state.isContacts {
+                offset += 40
+            }
             if let storiesItem = self.storiesItem {
                 offset += storiesItem.navigationHeight
             }
@@ -1884,9 +1892,6 @@ class PeerListContainerView : Control {
                 offset += foldersItem.height
             }
         } else if state.splitState == .minimisize {
-//            if !state.filterData.sidebar {
-//                offset += 20
-//            }
         }
         return offset
     }
@@ -2087,7 +2092,8 @@ private class SearchContainer : Control {
                 
                 let isForum = state.forumPeer != nil
                 
-                items.append(.init(title: isForum ? strings().chatListTopicsTag : state.peerTag == nil ? strings().chatListChatsTag : strings().chatListMessagesTag, index: index, uniqueId: -4, selected: state.selectedTag == .chats, insets: insets, icon: nil, theme: presentation, equatable: UIEquatable(state)))
+                let chatsLabel = FocusProduct.isEnabled ? "Conversations" : strings().chatListChatsTag
+                items.append(.init(title: isForum ? strings().chatListTopicsTag : state.peerTag == nil ? chatsLabel : strings().chatListMessagesTag, index: index, uniqueId: -4, selected: state.selectedTag == .chats, insets: insets, icon: nil, theme: presentation, equatable: UIEquatable(state)))
                 index += 1
                 
                 if state.hashtag != nil {
@@ -2096,7 +2102,7 @@ private class SearchContainer : Control {
                     index += 1
                 }
                 
-                if state.peerTag == nil, state.forumPeer == nil, !state.mode.isForumLike {
+                if state.peerTag == nil, state.forumPeer == nil, !state.mode.isForumLike, !state.isContacts {
                     if state.hasDownloads {
                         items.append(.init(title: strings().chatListDownloadsTag, index: index, uniqueId: -3, selected: state.selectedTag == .downloads, insets: insets, icon: nil, theme: presentation, equatable: UIEquatable(state)))
                         index += 1
@@ -2107,18 +2113,19 @@ private class SearchContainer : Control {
                     index += 1
                 }
                 
-                
-                let tags:[(MessageTags, String)] = [(.photo, strings().searchFilterPhotos),
-                                                    (.video, strings().searchFilterVideos),
-                                                    (.webPage, strings().searchFilterLinks),
-                                                    (.music, strings().searchFilterMusic),
-                                                    (.voiceOrInstantVideo, strings().searchFilterVoice),
-                                                    (.gif, strings().searchFilterGIFs),
-                                                    (.file, strings().searchFilterFiles)]
-                
-                for tag in tags {
-                    items.append(.init(title: tag.1, index: index, uniqueId: Int64(tag.0.rawValue), selected: state.selectedTag.rawValue == tag.0.rawValue, insets: insets, icon: nil, theme: presentation, equatable: UIEquatable(state)))
-                    index += 1
+                if !state.isContacts {
+                    let tags:[(MessageTags, String)] = [(.photo, strings().searchFilterPhotos),
+                                                        (.video, strings().searchFilterVideos),
+                                                        (.webPage, strings().searchFilterLinks),
+                                                        (.music, strings().searchFilterMusic),
+                                                        (.voiceOrInstantVideo, strings().searchFilterVoice),
+                                                        (.gif, strings().searchFilterGIFs),
+                                                        (.file, strings().searchFilterFiles)]
+                    
+                    for tag in tags {
+                        items.append(.init(title: tag.1, index: index, uniqueId: Int64(tag.0.rawValue), selected: state.selectedTag.rawValue == tag.0.rawValue, insets: insets, icon: nil, theme: presentation, equatable: UIEquatable(state)))
+                        index += 1
+                    }
                 }
             }
                         
@@ -2206,16 +2213,18 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
     
     let topics: ForumChannelTopics?
     let isContacts: Bool
+    let alwaysShowSearch: Bool
     var revealListener: TableScrollListener!
 
     
-    init(_ context: AccountContext, isContacts: Bool = false, followGlobal:Bool = true, mode: PeerListMode = .plain, searchOptions: AppSearchOptions = [.chats, .messages]) {
+    init(_ context: AccountContext, isContacts: Bool = false, followGlobal:Bool = true, mode: PeerListMode = .plain, searchOptions: AppSearchOptions = [.chats, .messages], alwaysShowSearch: Bool = false) {
         self.followGlobal = followGlobal
         self.mode = mode
         self.stateValue = Atomic(value: .initialize(isContacts))
         self.stateSignal = ValuePromise(.initialize(isContacts), ignoreRepeated: true)
 
         self.isContacts = isContacts
+        self.alwaysShowSearch = alwaysShowSearch
         self.searchOptions = searchOptions
         switch mode {
         case let .forum(peerId, _, _):
@@ -2331,6 +2340,9 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
         let mode = self.mode
         let isContacts = self.isContacts
         
+        if alwaysShowSearch {
+            genericView.focusAlwaysShowSearch = true
+        }
         
         genericView.customHandler.size = { [weak self] size in
             let frame = self?.genericView.searchViewRect ?? size.bounds
@@ -2687,6 +2699,9 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
             StoryModalController.ShowStories(context: context, isHidden: isHidden, initialId: initialId, singlePeer: singlePeer)
         }, getStoryInterfaceState: { [weak self] in
             guard let `self` = self else {
+                return .empty
+            }
+            if FocusProduct.isEnabled {
                 return .empty
             }
             if self.state?.splitState == .minimisize {
@@ -3047,25 +3062,27 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
             }
             
             
-            for tag in PeerListState.SelectedSearchTag.list(state) {
-                if tag == .downloads {
-                    let controller = DownloadsController(context: context, searchValue: self.genericView.searchView.searchValue |> map { $0.request })
-                    controller._frameRect = rect
-                    items.append(.init(title: { "\(tag.rawValue)" }, controller: controller))
-                } else {
-                    let searchController = SearchController(context: self.context, open: { [weak self] (id, messageId, close) in
-                        if let id = id {
-                            self?.open(with: id, messageId: messageId, close: close)
-                        } else {
-                            self?.genericView.searchView.cancel(true)
-                        }
-                    }, options: tag.searchOptions, frame: rect, target: target, tags: tag.searchTags(state.peerTag?.id, hashtag: state.hashtag))
-//                    searchController.defaultQuery = self.genericView.searchView.query
-                    searchController.pinnedItems = self.collectPinnedItems
-                    
-                    searchController.navigationController = self.navigationController
-                    
-                    items.append(.init(title: { "\(tag.rawValue)" }, controller: searchController))
+            if !isContacts {
+                for tag in PeerListState.SelectedSearchTag.list(state) {
+                    if tag == .downloads {
+                        let controller = DownloadsController(context: context, searchValue: self.genericView.searchView.searchValue |> map { $0.request })
+                        controller._frameRect = rect
+                        items.append(.init(title: { "\(tag.rawValue)" }, controller: controller))
+                    } else {
+                        let searchController = SearchController(context: self.context, open: { [weak self] (id, messageId, close) in
+                            if let id = id {
+                                self?.open(with: id, messageId: messageId, close: close)
+                            } else {
+                                self?.genericView.searchView.cancel(true)
+                            }
+                        }, options: tag.searchOptions, frame: rect, target: target, tags: tag.searchTags(state.peerTag?.id, hashtag: state.hashtag))
+    //                    searchController.defaultQuery = self.genericView.searchView.query
+                        searchController.pinnedItems = self.collectPinnedItems
+                        
+                        searchController.navigationController = self.navigationController
+                        
+                        items.append(.init(title: { "\(tag.rawValue)" }, controller: searchController))
+                    }
                 }
             }
             
@@ -3300,7 +3317,7 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
             break
         case .grace:
             break
-        case .systemDeprecated, .sharedFolderUpdated, .reveal, .empty, .loading, .space, .suspicious, .savedMessageIndex, .custom:
+        case .systemDeprecated, .sharedFolderUpdated, .reveal, .empty, .loading, .space, .suspicious, .savedMessageIndex, .custom, .sectionHeader, .storiesRail, .storiesEmpty:
             break
         }
         if close {

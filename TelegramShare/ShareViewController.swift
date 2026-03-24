@@ -58,7 +58,13 @@ class ShareViewController: NSViewController {
         let themeSemaphore = DispatchSemaphore(value: 0)
         var themeSettings: ThemePaletteSettings = ThemePaletteSettings.defaultTheme
         _ = (themeSettingsView(accountManager: accountManager) |> take(1)).start(next: { settings in
-            themeSettings = settings
+            if settings.palette.isDark {
+                themeSettings = settings
+                    .withUpdatedToDefault(dark: false, onlyLocal: true)
+                    .withUpdatedDefaultIsDark(false)
+            } else {
+                themeSettings = settings.withUpdatedDefaultIsDark(false)
+            }
             themeSemaphore.signal()
         })
         themeSemaphore.wait()

@@ -13,6 +13,7 @@ import SwiftSignalKit
 import TelegramCore
 import Translate
 import Postbox
+import InAppSettings
 import TGModernGrowingTextView
 import Localization
 
@@ -229,7 +230,7 @@ struct ChatHeaderState : Identifiable, Equatable {
         case .pinned:
             height += 44
         case .promo:
-            height += 44
+            if !FocusProduct.isEnabled { height += 44 }
         case .pendingRequests:
             height += 44
         case .requestChat:
@@ -244,7 +245,7 @@ struct ChatHeaderState : Identifiable, Equatable {
 
     var secondaryHeight:CGFloat {
         var height: CGFloat = 0
-        if let _ = voiceChat {
+        if let _ = voiceChat, !FocusProduct.isEnabled {
             height += 44
         }
         return height

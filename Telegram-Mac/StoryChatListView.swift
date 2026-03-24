@@ -329,8 +329,12 @@ private final class StoryListContainer : Control {
         let itemSize = NSMakeSize(w + (item.itemWidth - w) * progress, w + (item.itemHeight - w) * progress)
         
         
-        let cgCount = CGFloat(views.count)
-        let gapBetween = max(10.0, (frame.width - item.itemWidth * cgCount) / (cgCount + 1))
+        let cgCount = CGFloat(max(views.count, 1))
+        // Keep spacing compact when there are only a few stories.
+        // Without an upper clamp, the strip distributes items across the full row width,
+        // which looks sparse in the dedicated Focus Stories tab.
+        let adaptiveGap = (frame.width - item.itemWidth * cgCount) / (cgCount + 1)
+        let gapBetween = min(16.0, max(10.0, adaptiveGap))
 
         
         var frame = CGRect(origin: .zero, size: itemSize)
@@ -362,7 +366,7 @@ private final class StoryListContainer : Control {
                 frame.origin.x -= ((1.0 - progress) * itemSize.width / 2) * CGFloat(i - focusRange.location)
             }
         }
-        frame.origin.y = (self.frame.height - frame.height) / 2
+        frame.origin.y = (self.frame.height - frame.height) / 2 + 2
         
 //        frame.size.width = floorToScreenPixels(backingScaleFactor, frame.size.width)
 //        frame.size.height = floorToScreenPixels(backingScaleFactor, frame.size.height)
@@ -1152,6 +1156,85 @@ private final class ItemView : Control {
     
 }
 
+// MARK: - Focus Stories tab (rail-only row)
+
+/// Wraps `StoryListChatListRowItem` for use as a top-level chat list row on the Focus Stories tab.
+final class ChatListStoriesRailRowItem: TableRowItem {
+    private let _stableId: AnyHashable
+    let storyListItem: StoryListChatListRowItem
+
+    init(
+        _ initialSize: NSSize,
+        stableId: AnyHashable,
+        context: AccountContext,
+        subscriptions: EngineStorySubscriptions,
+        openStory: @escaping (StoryInitialIndex?, Bool, Bool) -> Void,
+        revealStoriesState: @escaping () -> Void
+    ) {
+        self._stableId = stableId
+        // Always use a revealed strip for this tab. PeersListController forces `.empty` for Focus on the main list,
+        // which would collapse the rail height to 0.
+        self.storyListItem = StoryListChatListRowItem(
+            initialSize,
+            stableId: "focusStoriesRailInner",
+            context: context,
+            isArchive: false,
+            state: subscriptions,
+            open: openStory,
+            getInterfaceState: { .revealed },
+            reveal: revealStoriesState
+        )
+        super.init(initialSize)
+    }
+
+    override var stableId: AnyHashable { _stableId }
+
+    /// The rail view applies a 6 pt top inset; include that in the row height so the
+    /// inner StoryListContainer always receives its full 66 pt design height.
+    static let topInset: CGFloat = 6
+    override var height: CGFloat { storyListItem.height + ChatListStoriesRailRowItem.topInset }
+
+    override func makeSize(_ width: CGFloat, oldWidth: CGFloat = 0) -> Bool {
+        _ = storyListItem.makeSize(width, oldWidth: oldWidth)
+        return super.makeSize(width, oldWidth: oldWidth)
+    }
+
+    override func viewClass() -> AnyClass {
+        return ChatListStoriesRailRowView.self
+    }
+}
+
+final class ChatListStoriesRailRowView: TableRowView {
+    private let rail = StoryListChatListRowView(frame: .zero)
+
+    required init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        addSubview(rail)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var backdorColor: NSColor { .clear }
+
+    override func set(item: TableRowItem, animated: Bool = false) {
+        super.set(item: item, animated: animated)
+        guard let item = item as? ChatListStoriesRailRowItem else {
+            return
+        }
+        rail.set(item: item.storyListItem, animated: animated)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        // The row height already includes the 6 pt top inset (see ChatListStoriesRailRowItem.topInset),
+        // so subtracting it here gives the inner rail exactly its design height (66 pt).
+        let topOffset = ChatListStoriesRailRowItem.topInset
+        rail.frame = NSMakeRect(0, topOffset, bounds.width, max(0, bounds.height - topOffset))
+    }
+}
 
 
 

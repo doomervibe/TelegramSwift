@@ -538,7 +538,7 @@ class FastSettings {
         if let value = UserDefaults.standard.value(forKey: kShowEmptyTips) as? Bool {
             return value
         }
-        return true
+        return false
     }
     static func updateEmptyTips(_ value: Bool) {
         UserDefaults.standard.setValue(value, forKey: kShowEmptyTips)

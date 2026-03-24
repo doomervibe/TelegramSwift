@@ -15,6 +15,7 @@ import Postbox
 import SwiftSignalKit
 import MtProtoKit
 import ThemeSettings
+import InAppSettings
 import Translate
 import InputView
 import TelegramMedia
@@ -1509,6 +1510,9 @@ func execute(inapp:inAppLink, window: Window? = nil, afterComplete: @escaping(Bo
 }
 
 private func updateAppAsYouWish(text: String, updateApp: Bool) {
+    if FocusProduct.isEnabled, updateApp {
+        return
+    }
     //
     if updateApp {
         verifyAlert_button(for: mainWindow, header: appName, information: text, ok: strings().alertButtonOKUpdateApp, cancel: strings().modalCancel, option: nil, successHandler: { _ in

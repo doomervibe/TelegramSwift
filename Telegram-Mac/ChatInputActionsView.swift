@@ -9,6 +9,7 @@
 import Cocoa
 import TGUIKit
 import TelegramCore
+import InAppSettings
 
 import SwiftSignalKit
 
@@ -380,7 +381,7 @@ class ChatInputActionsView: View {
                 }
               
                 if let peer = value.peer {
-                    muteChannelMessages.isHidden = !peer.isChannel || !peer.canSendMessage(value.chatMode.isThreadMode) || !value.effectiveInput.inputText.isEmpty || value.interfaceState.editState != nil
+                    muteChannelMessages.isHidden = FocusProduct.isEnabled || !peer.isChannel || !peer.canSendMessage(value.chatMode.isThreadMode) || !value.effectiveInput.inputText.isEmpty || value.interfaceState.editState != nil
                 }
                 
                 var newInlineRequest = value.inputQueryResult != oldValue.inputQueryResult
@@ -424,8 +425,8 @@ class ChatInputActionsView: View {
                 }
                 
                 
-                let sNew = !value.effectiveInput.inputText.isEmpty || !value.interfaceState.forwardMessageIds.isEmpty || value.state == .editing || value.chatMode.customChatLink != nil
-                let sOld = !oldValue.effectiveInput.inputText.isEmpty || !oldValue.interfaceState.forwardMessageIds.isEmpty || oldValue.state == .editing || value.chatMode.customChatLink != nil
+                let sNew = FocusProduct.isEnabled || !value.effectiveInput.inputText.isEmpty || !value.interfaceState.forwardMessageIds.isEmpty || value.state == .editing || value.chatMode.customChatLink != nil
+                let sOld = FocusProduct.isEnabled || !oldValue.effectiveInput.inputText.isEmpty || !oldValue.interfaceState.forwardMessageIds.isEmpty || oldValue.state == .editing || value.chatMode.customChatLink != nil
                 
                 if value.chatMode.customChatLink != nil {
                     send.isEnabled = !value.effectiveInput.inputText.isEmpty
@@ -517,11 +518,18 @@ class ChatInputActionsView: View {
                 }
        
                 entertaiments.apply(state: .Normal)
-                entertaiments.isSelected = value.isShowSidebar 
-                
-                keyboard.isHidden = !value.isKeyboardActive
-                gift.isHidden = !value.hasGift
-                suggestPost.isHidden = !value.allowPostSuggestion || value.interfaceState.suggestPost != nil
+                entertaiments.isSelected = value.isShowSidebar
+
+                if FocusProduct.isEnabled {
+                    entertaiments.isHidden = true
+                    keyboard.isHidden = true
+                    gift.isHidden = true
+                    suggestPost.isHidden = true
+                } else {
+                    keyboard.isHidden = !value.isKeyboardActive
+                    gift.isHidden = !value.hasGift
+                    suggestPost.isHidden = !value.allowPostSuggestion || value.interfaceState.suggestPost != nil
+                }
                 
                 if let keyboardMessage = value.keyboardButtonsMessage {
                     if let closedId = value.interfaceState.messageActionsState.closedButtonKeyboardMessageId, closedId == keyboardMessage.id {

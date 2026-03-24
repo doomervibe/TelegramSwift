@@ -9,6 +9,7 @@
 import Cocoa
 import TGUIKit
 import TelegramCore
+import InAppSettings
 
 
 
@@ -156,7 +157,7 @@ class ChatRightView: View, ViewDisplayDelegate {
         }
         private func makeRead(_ item: ChatRowItem, _ size: NSSize, _ x: inout CGFloat) -> CGRect? {
             let hasState = !item.isIncoming && !item.isUnsent && !item.isFailed && !item.chatInteraction.isLogInteraction
-            let hasRead = hasState && item.isRead && !item.hasSource
+            let hasRead = hasState && item.isRead && !item.hasSource && !FocusProduct.isEnabled
             if hasRead {
                 var rect = size.bounds.focus(item.presentation.chat.readStateIcon(item).backingSize)
                 rect.origin.x = x - 8

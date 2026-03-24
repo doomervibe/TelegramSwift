@@ -387,7 +387,11 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
             }
         }
         
-        disposableDict.set((combineLatest(account.stateManager.notificationMessages, reactions) |> mapToSignal { messages, reactions -> Signal<([Source], InAppNotificationSettings), NoError> in
+        let rawNotifications = combineLatest(account.stateManager.notificationMessages, reactions)
+        let notificationSource = FocusProduct.isEnabled
+            ? rawNotifications |> delay(300.0, queue: .mainQueue())
+            : rawNotifications
+        disposableDict.set((notificationSource |> mapToSignal { messages, reactions -> Signal<([Source], InAppNotificationSettings), NoError> in
             return appNotificationSettings(accountManager: self.accountManager) |> take(1) |> mapToSignal { inAppSettings -> Signal<([Source], InAppNotificationSettings), NoError> in
                 self.showNotificationsOutOfFocus = inAppSettings.showNotificationsOutOfFocus
                 self.requestUserAttention = inAppSettings.requestUserAttention
@@ -402,8 +406,27 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                     let rctns:[Source] = reactions.map {
                         .reaction($0.message, $0.reactionAuthor, $0.reaction, $0.timestamp, $0.file, $0.threadData)
                     }
+                    
+                    let combined: [Source]
+                    if FocusProduct.isEnabled {
+                        let m = msgs.compactMap { src -> Source? in
+                            if case let .messages(msgs, gid, thread) = src {
+                                let kept = msgs.filter { m in
+                                    if let p = coreMessageMainPeer(m) { return !p.isChannel }
+                                    return true
+                                }
+                                if kept.isEmpty { return nil }
+                                return .messages(kept, gid, thread)
+                            }
+                            return src
+                        }
+                        // In focus mode, suppress all reaction notifications
+                        combined = m
+                    } else {
+                        combined = msgs + rctns
+                    }
 
-                    return .single((msgs + rctns, inAppSettings))
+                    return .single((combined, inAppSettings))
                 } else {
                     return .complete()
                 }
@@ -483,11 +506,23 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                     return
                 }
 
+                // In focus mode: coalesce per-peer — only emit one notification per peer per batch
+                var focusNotifiedPeers: Set<PeerId> = []
+
                 for source in sources {
                     loop: for message in source.messages {
                         
                         if alreadyNotified.contains(source.key(for: message)) {
                             continue
+                        }
+
+                        if FocusProduct.isEnabled {
+                            let peerId = message.id.peerId
+                            if focusNotifiedPeers.contains(peerId) {
+                                alreadyNotified.insert(source.key(for: message))
+                                continue
+                            }
+                            focusNotifiedPeers.insert(peerId)
                         }
 
                         if message.isImported {
@@ -616,6 +651,9 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                             }
                            
                             if screenIsLocked {
+                                notification.soundName = nil
+                            }
+                            if FocusProduct.isEnabled {
                                 notification.soundName = nil
                             }
                                                         

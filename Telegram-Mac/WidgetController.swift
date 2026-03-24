@@ -291,7 +291,6 @@ final class WidgetController : TelegramGenericViewController<WidgetListView> {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        controllers.append(WidgetAppearanceController(context))
         #if BETA || STABLE
         controllers.append(WidgetAppIconController(context))
         #endif

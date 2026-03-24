@@ -186,7 +186,7 @@ class ShortPeerRowItem: GeneralRowItem {
     func textInset(_ status: Bool) -> CGFloat {
         switch viewType {
         case .legacy:
-            var width = inset.left + photoSize.width + 10.0 + (leftImage != nil ? leftImage!.backingSize.width + 5 : 0)
+            var width = inset.left + (leftImage != nil ? leftImage!.backingSize.width + 5 : 0)
             
             #if !SHARE
             if self.highlightVerified, (!self.isLookSavedMessage || self.peerId != self.account.peerId) {
@@ -201,7 +201,7 @@ class ShortPeerRowItem: GeneralRowItem {
             #endif
             return width
         case let .modern(_, insets):
-            var width = photoSize.width + min(10, insets.left) + (leftImage != nil ? leftImage!.backingSize.width + 5 : 0)
+            var width = min(10, insets.left) + (leftImage != nil ? leftImage!.backingSize.width + 5 : 0)
             
             #if !SHARE
             if self.highlightVerified, (!self.isLookSavedMessage || self.peerId != self.account.peerId) {
@@ -282,6 +282,9 @@ class ShortPeerRowItem: GeneralRowItem {
     
     let monoforumMessages: TextViewLayout?
     let monoforumMessagesSelected: TextViewLayout?
+
+    // Focus fork: when true, the avatar is hidden until mouse hover.
+    var focusHoverOnlyAvatar: Bool = false
 
     
     init(_ initialSize:NSSize, peer: Peer, account: Account, context: AccountContext?, peerId: PeerId? = nil, stableId:AnyHashable? = nil, enabled: Bool = true, height:CGFloat = 50, photoSize:NSSize = NSMakeSize(36, 36), titleStyle:ControlStyle = ControlStyle(font: .medium(.title), foregroundColor: theme.colors.text, highlightColor: .white), titleAddition:String? = nil, leftImage:CGImage? = nil, statusStyle:ControlStyle = ControlStyle(font:.normal(.text), foregroundColor: theme.colors.grayText, highlightColor:.white), status:String? = nil, borderType:BorderType = [], drawCustomSeparator:Bool = true, isLookSavedMessage: Bool = false, deleteInset:CGFloat? = nil, drawLastSeparator:Bool = false, inset:NSEdgeInsets = NSEdgeInsets(left:10.0), drawSeparatorIgnoringInset: Bool = false, interactionType:ShortPeerItemInteractionType = .plain, generalType:GeneralInteractedType = .none, viewType: GeneralViewType = .legacy, action:@escaping ()->Void = {}, contextMenuItems:@escaping()->Signal<[ContextMenuItem], NoError> = { .single([]) }, inputActivity: PeerInputActivity? = nil, highlightOnHover: Bool = false, alwaysHighlight: Bool = false, badgeNode: GlobalBadgeNode? = nil, compactText: Bool = false, highlightVerified: Bool = false, customTheme: GeneralRowItem.Theme? = nil, drawPhotoOuter: Bool = false, disabledAction:(()->Void)? = nil, story: EngineStorySubscriptions.Item? = nil, openStory: @escaping(StoryInitialIndex?)->Void = { _ in }, menuOnAction: Bool = false, photoBadge: CGImage? = nil, customAction: CustomAction? = nil, makeAvatarRound: Bool = false, drawStarsPaid: StarsAmount? = nil, statusImage: CGImage? = nil, passLeftAction: Bool = false, rightActions: RightActions = .init(), monoforumPeer: Peer? = nil) {

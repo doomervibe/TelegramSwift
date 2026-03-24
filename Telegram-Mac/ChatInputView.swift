@@ -15,6 +15,7 @@ import InputView
 import Postbox
 import ColorPalette
 import TelegramMedia
+import InAppSettings
 
 protocol ChatInputDelegate : AnyObject {
     func inputChanged(height:CGFloat, animated:Bool);
@@ -355,6 +356,9 @@ class ChatInputView: View, Notifable {
         if !chatInteraction.peerIsAccountPeer {
             return strings().messagesPlaceholderAnonymous
         }
+        if FocusProduct.isEnabled {
+            return "Write a reply…"
+        }
         return strings().messagesPlaceholderSentMessage
     }
     
@@ -580,7 +584,7 @@ class ChatInputView: View, Notifable {
     }
     
     func needUpdateReplyMarkup(with state:ChatPresentationInterfaceState, _ animated:Bool) {
-        if let keyboardMessage = state.keyboardButtonsMessage, let attribute = keyboardMessage.replyMarkup, state.isKeyboardShown || attribute.flags.contains(.persistent) {
+        if !FocusProduct.isEnabled, let keyboardMessage = state.keyboardButtonsMessage, let attribute = keyboardMessage.replyMarkup, state.isKeyboardShown || attribute.flags.contains(.persistent) {
             replyMarkupModel = ReplyMarkupNode(attribute.rows, attribute.flags, chatInteraction.processBotKeyboard(with: keyboardMessage), theme, bottomView.documentView as? View, true)
             replyMarkupModel?.measureSize(frame.width - 40)
             replyMarkupModel?.redraw()
@@ -897,7 +901,7 @@ class ChatInputView: View, Notifable {
             }
         }
         
-        if chatInteraction.context.peerId != chatInteraction.peerId, let peer = chatInteraction.presentation.peer, !peer.isChannel && !markNextTextChangeToFalseActivity {
+        if !FocusProduct.isEnabled, chatInteraction.context.peerId != chatInteraction.peerId, let peer = chatInteraction.presentation.peer, !peer.isChannel && !markNextTextChangeToFalseActivity {
             sendActivityDisposable.set((Signal<Bool, NoError>.single(!state.effectiveInput.inputText.isEmpty) |> then(Signal<Bool, NoError>.single(false) |> delay(4.0, queue: Queue.mainQueue()))).start(next: { [weak self] isPresent in
                 if let chatInteraction = self?.chatInteraction, let peer = chatInteraction.presentation.peer, !peer.isChannel && chatInteraction.presentation.state != .editing {
                     if self?.chatInteraction.peerIsAccountPeer == true {

@@ -256,7 +256,9 @@ class ChatMessageItem: ChatRowItem {
             #if APP_STORE
             execute(inapp: inAppLink.external(link: itunesAppLink, false))
             #else
-            (NSApp.delegate as? AppDelegate)?.checkForUpdates("")
+            if !FocusProduct.isEnabled {
+                (NSApp.delegate as? AppDelegate)?.checkForUpdates("")
+            }
             #endif
         }
     }
@@ -333,7 +335,7 @@ class ChatMessageItem: ChatRowItem {
                     chatInteraction?.openInfo(peerId, toChat, postId, toChat ? (initialAction ?? .source(message.id, nil)) : nil)
                 }
                 
-                messageAttr = ChatMessageItem.applyMessageEntities(with: attributes, for: text, message: message, context: context, fontSize: theme.fontSize, openInfo:openInfo, botCommand:chatInteraction.sendPlainText, hashtag: chatInteraction.hashtag, applyProxy: chatInteraction.applyProxy, textColor: theme.chat.textColor(isIncoming, entry.renderType == .bubble), linkColor: theme.chat.linkColor(isIncoming, entry.renderType == .bubble), monospacedPre: theme.chat.monospacedPreColor(isIncoming, entry.renderType == .bubble), monospacedCode: theme.chat.monospacedCodeColor(isIncoming, entry.renderType == .bubble), mediaDuration: mediaDuration, timecode: { timecode in
+                messageAttr = ChatMessageItem.applyMessageEntities(with: attributes, for: text, message: message, context: context, fontSize: theme.chatMessageFontSize, openInfo:openInfo, botCommand:chatInteraction.sendPlainText, hashtag: chatInteraction.hashtag, applyProxy: chatInteraction.applyProxy, textColor: theme.chat.textColor(isIncoming, entry.renderType == .bubble), linkColor: theme.chat.linkColor(isIncoming, entry.renderType == .bubble), monospacedPre: theme.chat.monospacedPreColor(isIncoming, entry.renderType == .bubble), monospacedCode: theme.chat.monospacedCodeColor(isIncoming, entry.renderType == .bubble), mediaDuration: mediaDuration, timecode: { timecode in
                     openSpecificTimecodeFromReply?(timecode)
                 }, blockColor: theme.chat.blockColor(context.peerNameColors, message: message, isIncoming: isIncoming, bubbled: entry.renderType == .bubble), isDark: theme.colors.isDark, bubbled: entry.renderType == .bubble, codeSyntaxData: entry.additionalData.codeSyntaxData, loadCodeSyntax: chatInteraction.enqueueCodeSyntax, openPhoneNumber: chatInteraction.openPhoneNumberContextMenu, ignoreLinks: !entry.additionalData.canHighlightLinks && isIncoming).mutableCopy() as! NSMutableAttributedString
                 
@@ -353,19 +355,19 @@ class ChatMessageItem: ChatRowItem {
                 containsBigEmoji = true
                 switch copy.string.count {
                 case 1:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 8), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 8), range: copy.range)
                 case 2:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 7), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 7), range: copy.range)
                 case 3:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 6), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 6), range: copy.range)
                 case 4:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 5), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 5), range: copy.range)
                 case 5:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 4), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 4), range: copy.range)
                 case 6:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 3), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 3), range: copy.range)
                 default:
-                    copy.addAttribute(.font, value: NSFont.normal(theme.fontSize * 2), range: copy.range)
+                    copy.addAttribute(.font, value: NSFont.normal(theme.chatMessageFontSize * 2), range: copy.range)
                 }
             } else {
                 containsBigEmoji = false
@@ -401,7 +403,7 @@ class ChatMessageItem: ChatRowItem {
              if let _ = message.adAttribute {
                  messageText = .init()
              } else  if let text = message.restrictedText(context.contentSettings) {
-                 self.messageText = .initialize(string: text, color: theme.colors.grayText, font: .italic(theme.fontSize))
+                 self.messageText = .initialize(string: text, color: theme.colors.grayText, font: .italic(theme.chatMessageFontSize))
              } else {
                  self.messageText = copy
              }
@@ -437,7 +439,7 @@ class ChatMessageItem: ChatRowItem {
             
             super.init(initialSize, chatInteraction, context, entry, theme: theme)
             
-             let ignoreWebpage = !entry.additionalData.canHighlightLinks && isIncoming
+             let ignoreWebpage = (!entry.additionalData.canHighlightLinks && isIncoming) || FocusProduct.isEnabled
             
              if let webpage = media as? TelegramMediaWebpage, !ignoreWebpage {
                  switch webpage.content {

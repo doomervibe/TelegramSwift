@@ -238,14 +238,14 @@ class EmptyChatViewController: TelegramGenericViewController<EmptyChatView> {
         self.ready.set(cards.ready.get())
         
         
-        self.genericView.toggleTips(FastSettings.emptyTips, animated: false, view: cards.view)
+        self.genericView.toggleTips(false, animated: false, view: cards.view)
         
         self.genericView.toggleTips.set(handler: { [weak self] _ in
             guard let cards = self?.cards.view else {
                 return
             }
-            FastSettings.updateEmptyTips(!FastSettings.emptyTips)
-            self?.genericView.toggleTips(FastSettings.emptyTips, animated: true, view: cards)
+            FastSettings.updateEmptyTips(false)
+            self?.genericView.toggleTips(false, animated: true, view: cards)
         }, for: .Click)
     }
     

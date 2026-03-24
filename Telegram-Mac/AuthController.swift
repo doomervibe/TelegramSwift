@@ -399,7 +399,9 @@ class AuthController : GenericViewController<AuthView> {
     override func viewDidLoad() {
         super.viewDidLoad()
         #if !APP_STORE
-        genericView.updateView = updateController.view
+        if !FocusProduct.isEnabled {
+            genericView.updateView = updateController.view
+        }
         #endif
         
         if otherAccountPhoneNumbers.1.isEmpty {
@@ -1196,7 +1198,9 @@ class AuthController : GenericViewController<AuthView> {
         password_entry_c.updateLocalizationAndTheme(theme: theme)
         
         #if !APP_STORE
-        updateController.updateLocalizationAndTheme(theme: theme)
+        if !FocusProduct.isEnabled {
+            updateController.updateLocalizationAndTheme(theme: theme)
+        }
         #endif
     }
     override func viewDidResized(_ size: NSSize) {

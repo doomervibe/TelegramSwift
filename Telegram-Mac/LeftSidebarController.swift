@@ -208,6 +208,9 @@ private enum LeftSibarBarEntry : Comparable, Identifiable {
 }
 
 private func leftSidebarEntries(_ filterData: FilterData, _ badges: ChatListFilterBadges) -> [LeftSibarBarEntry] {
+    if FocusProduct.isEnabled {
+        return []
+    }
     var index: Int = 1
     
     var entries:[LeftSibarBarEntry] = []

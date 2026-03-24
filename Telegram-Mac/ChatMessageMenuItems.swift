@@ -616,7 +616,7 @@ func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (
             
         }
         
-        if data.chatLocation.threadMsgId == nil, let peer = peer, peer.isSupergroup {
+        if data.chatLocation.threadMsgId == nil, let peer = peer, peer.isSupergroup, !FocusProduct.isEnabled {
             if let attr = data.message.threadAttr, attr.count > 0, mode != .scheduled {
                 var messageId: MessageId = message.id
                 var modeIsReplies = true
@@ -832,7 +832,7 @@ func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (
             }
         }
         
-        if !data.message.isScheduledMessage, let peer = peer, !peer.isDeleted, isNotFailed, data.peerId == data.message.id.peerId, !isService, mode.customChatContents == nil {
+        if !FocusProduct.isEnabled, !data.message.isScheduledMessage, let peer = peer, !peer.isDeleted, isNotFailed, data.peerId == data.message.id.peerId, !isService, mode.customChatContents == nil {
             
             let needUnpin = data.pinnedMessage?.others.contains(data.message.id) == true
             let pinAndOld: Bool
@@ -890,7 +890,7 @@ func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (
             }
         }
         
-        if canForwardMessage(data.message, chatInteraction: data.chatInteraction), !isService {
+        if !FocusProduct.isEnabled, canForwardMessage(data.message, chatInteraction: data.chatInteraction), !isService {
             let msgs = useGroupIfNeeded ? (data.groupped ?? [data.message]) : [data.message]
             let forwardItem = ContextMenuItem(strings().messageContextForward, handler: {
                 data.chatInteraction.forwardMessages(msgs)
@@ -1010,7 +1010,7 @@ func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (
             }, itemImage: MenuAnimation.menu_select_messages.value))
         }
         
-        if let channel = data.message.peers[message.id.peerId] as? TelegramChannel, channel.isChannel, !isService {
+        if !FocusProduct.isEnabled, let channel = data.message.peers[message.id.peerId] as? TelegramChannel, channel.isChannel, !isService {
             var views: Int = 0
             for attribute in message.attributes {
                 if let attribute = attribute as? ViewCountMessageAttribute {
@@ -1029,7 +1029,7 @@ func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (
         
      
         
-        if let resourceData = data.resourceData, !protected {
+        if !FocusProduct.isEnabled, let resourceData = data.resourceData, !protected {
             if let file = data.file {
                 if file.isVideo && file.isAnimated {
                     if data.recentMedia.contains(where: {$0.media.id == file.fileId}) {
@@ -1210,7 +1210,7 @@ func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (
             }
         }
         
-        if (MessageReadMenuItem.canViewReadStats(message: data.message, chatInteraction: data.chatInteraction, appConfig: appConfiguration)), data.isRead, !data.isLogInteraction {
+        if !FocusProduct.isEnabled, (MessageReadMenuItem.canViewReadStats(message: data.message, chatInteraction: data.chatInteraction, appConfig: appConfiguration)), data.isRead, !data.isLogInteraction {
             if data.message.id.peerId.namespace == Namespaces.Peer.CloudUser  {
                 fourthBlock.append(MessageReadMenuItem(context: context, chatInteraction: data.chatInteraction, message: message, availableReactions: data.availableReactions))
             } else {

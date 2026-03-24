@@ -13,7 +13,8 @@
 #include "common.xcconfig"
 
 DSA_PEM_FILE = dsa_pub.pem
-SFEED_URL = https:$(SIMPLE_SLASH)/mac-updates.telegram.org/beta/versions.xml
+// Focus fork: do not fetch official Telegram appcast (Sparkle is gated off in code when FocusProduct.isEnabled).
+SFEED_URL = https://invalid.invalid/focus-fork-no-updates.xml
 SOURCE = DEBUG
 
 TYPE = -D'BETA'

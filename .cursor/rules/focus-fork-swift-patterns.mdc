@@ -1,0 +1,31 @@
+---
+description: Swift code patterns for the TelegramSwift focus fork
+globs: Telegram-Mac/**/*.swift
+alwaysApply: false
+---
+
+# Focus-Fork Swift Patterns
+
+## `FocusProduct.isEnabled` usage
+
+We do not need to preserve the stock Telegram experience. Modifying code directly is fine — `FocusProduct.isEnabled` guards are optional and only useful for greppability, not as a requirement. Feel free to change or remove stock behavior unconditionally when it conflicts with the focus fork.
+
+## Section headers in the chat list
+
+Section headers are injected into the entry stream **after sorting** in the `mapToQueue` block of `ChatListController.swift`, not in the data layer. The `UIChatListEntry.sectionHeader(String)` case exists only for this purpose.
+
+## Digest banner
+
+The digest banner is a `UIDigestBannerAction` (conforming to `UIChatListTextAction`). It is inserted as a `.custom(action)` entry. Channels are filtered from the main list (`prepareEntries` → `includeChatListEntry`) and surfaced only via this banner.
+
+## Media placeholders
+
+Replace inline media (photos, stickers, GIFs, video, albums) with `ChatFocusMediaPlaceholderItem` rows. Use `focusPlaceholderLabel(for:)` / `focusGroupedPlaceholderTitle(for:)` helpers in `ChatRowItem.swift` to generate the label string.
+
+## Theme
+
+Never call `updateThemeInteractivetly` or `telegramUpdateTheme` with a dark palette — `Appearance.swift` normalises to light automatically. Do not add new auto-night or system-appearance observers.
+
+## Compose area
+
+Placeholder text for the generic message input in focus mode is `"Write a reply…"` (set in `ChatInputView.textPlaceholder`). Emoji/keyboard/gift buttons are already hidden via `FocusProduct.isEnabled` in `ChatInputActionsView`.

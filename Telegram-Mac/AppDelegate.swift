@@ -715,6 +715,10 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 
                 
                 _ = combineLatest(autoNightSignal, additionalSettings(accountManager: accountManager)).start(next: { value1, value2 in
+                    // Focus build: lock light theme and suppress any auto-night runtime flips.
+                    if FocusProduct.isEnabled {
+                        return
+                    }
                     
                     let preference = value1.0
                     let alwaysDarkMode = value2.alwaysDarkMode
@@ -1095,6 +1099,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                 execute(inapp: inApp(for: executeUrlAfterLogin.nsstring, context: context.context))
                             }
                             #if !APP_STORE
+                            if !FocusProduct.isEnabled {
                             networkDisposable.set((context.context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
                                 let settings = settings.values[PreferencesKeys.networkSettings]?.get(NetworkSettings.self)
                                 
@@ -1116,6 +1121,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                 #endif
                                 
                             }))
+                            }
                             #endif
                             
                             if let url = AppDelegate.eventProcessed {
@@ -1161,6 +1167,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                     showModal(with: context.modal, for: window, animated: presentAuthAnimated)
                                     
                                     #if !APP_STORE
+                                    if !FocusProduct.isEnabled {
                                     networkDisposable.set((context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
                                         let settings = settings.values[PreferencesKeys.networkSettings]?.get(NetworkSettings.self)
                                         
@@ -1186,6 +1193,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                         #endif
                                         
                                     }))
+                                    }
                                     #endif
                                     
                                     
@@ -1289,6 +1297,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
     @IBAction func checkForUpdates(_ sender: Any) {
         #if !APP_STORE
+        guard !FocusProduct.isEnabled else { return }
             showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
             #if STABLE
                 if let context = self.contextValue?.context {
@@ -1307,12 +1316,17 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         if let menu = NSApp.mainMenu?.item(at: 0)?.submenu, let sparkleItem = menu.item(withTag: 1000) {
             menu.removeItem(sparkleItem)
         }
+        #elseif !APP_STORE
+        if FocusProduct.isEnabled, let menu = NSApp.mainMenu?.item(at: 0)?.submenu, let sparkleItem = menu.item(withTag: 1000) {
+            menu.removeItem(sparkleItem)
+        }
         #endif
     }
     
     
     @objc func checkUpdates() {
         #if !APP_STORE
+        guard !FocusProduct.isEnabled else { return }
         showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
         #endif
     }
@@ -1506,7 +1520,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         deinitCrashHandler(containerUrl)
         
         #if !APP_STORE
+        if !FocusProduct.isEnabled {
             updateAppIfNeeded()
+        }
         #endif
     }
     

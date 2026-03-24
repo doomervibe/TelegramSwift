@@ -2479,6 +2479,9 @@ class TelegramPresentationTheme : PresentationTheme {
     }
     
     var controllerBackgroundMode: TableBackgroundMode {
+        if FocusProduct.isEnabled {
+            return .color(color: colors.chatBackground)
+        }
         if self.bubbled {
             return self.backgroundMode
         } else {
@@ -3483,38 +3486,47 @@ func generateTheme(palette: ColorPalette, cloudTheme: TelegramTheme?, bubbled: B
 
 
 func updateTheme(with settings: ThemePaletteSettings, for window: Window? = nil, animated: Bool = false) -> TelegramPresentationTheme {
+    let normalizedSettings: ThemePaletteSettings
+    if settings.palette.isDark {
+        normalizedSettings = settings
+            .withUpdatedToDefault(dark: false, onlyLocal: true)
+            .withUpdatedDefaultIsDark(false)
+    } else {
+        normalizedSettings = settings.withUpdatedDefaultIsDark(false)
+    }
+    
     let palette: ColorPalette
-    switch settings.palette.name {
+    switch normalizedSettings.palette.name {
     case whitePalette.name:
-        if settings.palette.accent == whitePalette.accent {
+        if normalizedSettings.palette.accent == whitePalette.accent {
             palette = whitePalette
         } else {
-            palette = settings.palette
+            palette = normalizedSettings.palette
         }
     case darkPalette.name:
-        if settings.palette.accent == darkPalette.accent {
+        if normalizedSettings.palette.accent == darkPalette.accent {
             palette = darkPalette
         } else {
-            palette = settings.palette
+            palette = normalizedSettings.palette
         }
     case dayClassicPalette.name:
-        if settings.palette.accent == dayClassicPalette.accent {
+        if normalizedSettings.palette.accent == dayClassicPalette.accent {
             palette = dayClassicPalette
         } else {
-            palette = settings.palette
+            palette = normalizedSettings.palette
         }
     case nightAccentPalette.name:
-        if settings.palette.accent == nightAccentPalette.accent {
+        if normalizedSettings.palette.accent == nightAccentPalette.accent {
             palette = nightAccentPalette
         } else {
-            palette = settings.palette
+            palette = normalizedSettings.palette
         }
     case systemPalette.name:
-        palette = systemPalette
+        palette = dayClassicPalette
     default:
-        palette = settings.palette
+        palette = normalizedSettings.palette
     }
-    let theme = generateTheme(palette: palette, cloudTheme: settings.cloudTheme, bubbled: settings.bubbled, fontSize: settings.fontSize, wallpaper: settings.wallpaper)
+    let theme = generateTheme(palette: palette, cloudTheme: normalizedSettings.cloudTheme, bubbled: normalizedSettings.bubbled, fontSize: normalizedSettings.fontSize, wallpaper: normalizedSettings.wallpaper)
     return theme
 }
 
@@ -3639,3 +3651,10 @@ func generateSyntaxThemeParams(_ presentationTheme: TelegramPresentationTheme, b
     ]
 }
 #endif
+
+extension TelegramPresentationTheme {
+    /// Slightly larger message body text in the focus-first fork.
+    var chatMessageFontSize: CGFloat {
+        FocusProduct.isEnabled ? min(fontSize + 2, 22) : fontSize
+    }
+}

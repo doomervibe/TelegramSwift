@@ -1279,6 +1279,12 @@
 		C22A899F1EBCC2AA005B963D /* CallNavigationHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22A899E1EBCC2AA005B963D /* CallNavigationHeaderView.swift */; };
 		C22E06321D8044CC00A11C88 /* ChatListController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22E06311D8044CC00A11C88 /* ChatListController.swift */; };
 		C22E063D1D80929400A11C88 /* ChatListRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22E063C1D80929400A11C88 /* ChatListRowItem.swift */; };
+		27F3000126F4000100000001 /* FocusMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000002 /* FocusMode.swift */; };
+		27F3000126F4000100000003 /* ChatFocusMediaPlaceholderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */; };
+		27F3000126F4000100000005 /* FocusDigestController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000006 /* FocusDigestController.swift */; };
+		27F3000126F4000100000007 /* FocusCategoryStripController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000008 /* FocusCategoryStripController.swift */; };
+		27F3000126F400010000000D /* FocusAvatarHoverManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F400010000000C /* FocusAvatarHoverManager.swift */; };
+		27F3000126F400010000000F /* FocusMediaSearchRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */; };
 		C22EBCB81DFAB36A0034C435 /* ChatMapRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22EBCB71DFAB36A0034C435 /* ChatMapRowItem.swift */; };
 		C22EBCBA1DFAB64F0034C435 /* ChatMapContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22EBCB91DFAB64F0034C435 /* ChatMapContentView.swift */; };
 		C22EE6191E66ECB200334C38 /* ReportReasonModalController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22EE6181E66ECB200334C38 /* ReportReasonModalController.swift */; };
@@ -2950,6 +2956,12 @@
 		C22A899E1EBCC2AA005B963D /* CallNavigationHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CallNavigationHeaderView.swift; sourceTree = "<group>"; };
 		C22E06311D8044CC00A11C88 /* ChatListController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatListController.swift; sourceTree = "<group>"; };
 		C22E063C1D80929400A11C88 /* ChatListRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatListRowItem.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000002 /* FocusMode.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusMode.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatFocusMediaPlaceholderItem.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000006 /* FocusDigestController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusDigestController.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000008 /* FocusCategoryStripController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusCategoryStripController.swift; sourceTree = "<group>"; };
+		27F3000126F400010000000C /* FocusAvatarHoverManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusAvatarHoverManager.swift; sourceTree = "<group>"; };
+		27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusMediaSearchRowItem.swift; sourceTree = "<group>"; };
 		C22EBCB71DFAB36A0034C435 /* ChatMapRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatMapRowItem.swift; sourceTree = "<group>"; };
 		C22EBCB91DFAB64F0034C435 /* ChatMapContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatMapContentView.swift; sourceTree = "<group>"; };
 		C22EE6181E66ECB200334C38 /* ReportReasonModalController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReportReasonModalController.swift; sourceTree = "<group>"; };
@@ -5453,6 +5465,12 @@
 				2786368327C8B73E00690B10 /* downloads */,
 				A789E08223E05E9A00AEB34A /* filters */,
 				C22E06311D8044CC00A11C88 /* ChatListController.swift */,
+				27F3000126F4000100000002 /* FocusMode.swift */,
+				27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */,
+				27F3000126F4000100000006 /* FocusDigestController.swift */,
+				27F3000126F4000100000008 /* FocusCategoryStripController.swift */,
+				27F3000126F400010000000C /* FocusAvatarHoverManager.swift */,
+				27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */,
 				C22E063C1D80929400A11C88 /* ChatListRowItem.swift */,
 				C2CBCAC41D81649E00142EC0 /* ChatListRowView.swift */,
 				C25FC7FA1D86FEA90041E303 /* ChatListHoleRowItem.swift */,
@@ -8427,6 +8445,12 @@
 				D0E3684624D80A0D009896D4 /* ClearCache.swift in Sources */,
 				D00CE50F2289CE87008C1B4F /* ChatAnimatedStickerItem.swift in Sources */,
 				C230BEB41EE97B6F0029586C /* RestictedModalViewController.swift in Sources */,
+				27F3000126F4000100000001 /* FocusMode.swift in Sources */,
+				27F3000126F4000100000003 /* ChatFocusMediaPlaceholderItem.swift in Sources */,
+				27F3000126F4000100000005 /* FocusDigestController.swift in Sources */,
+				27F3000126F4000100000007 /* FocusCategoryStripController.swift in Sources */,
+				27F3000126F400010000000D /* FocusAvatarHoverManager.swift in Sources */,
+				27F3000126F400010000000F /* FocusMediaSearchRowItem.swift in Sources */,
 				C22E063D1D80929400A11C88 /* ChatListRowItem.swift in Sources */,
 				C20D5AB11DA996480042616A /* EBlockItem.swift in Sources */,
 				9F17E5B9212F173900C25A65 /* AutoNightViewController.swift in Sources */,
@@ -9006,7 +9030,6 @@
 				OTHER_LDFLAGS = (
 					"-ObjC",
 					"-Wl,-ld_classic",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/macosx/libswiftAppKit.dylib",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram;
@@ -9060,7 +9083,7 @@
 				MARKETING_VERSION = 11.14.1;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CODE_SIGN_FLAGS = "";
-				OTHER_LDFLAGS = "$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/macosx/libswiftAppKit.dylib";
+				OTHER_LDFLAGS = "";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram.TelegramShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -9112,7 +9135,7 @@
 				MARKETING_VERSION = 11.14.1;
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_CODE_SIGN_FLAGS = "";
-				OTHER_LDFLAGS = "$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/macosx/libswiftAppKit.dylib";
+				OTHER_LDFLAGS = "";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				"OTHER_SWIFT_FLAGS[arch=*]" = "";
 				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram.TelegramShare;
@@ -9237,7 +9260,6 @@
 				OTHER_LDFLAGS = (
 					"-ObjC",
 					"-Wl,-ld_classic",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/macosx/libswiftAppKit.dylib",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram;

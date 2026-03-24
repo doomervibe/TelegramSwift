@@ -89,6 +89,9 @@ class SharedAccountContext {
     
    
     func isLite(_ key: LiteModeKey = .any) -> Bool {
+        if FocusProduct.isEnabled {
+            return true
+        }
         let mode = baseSettings.liteMode
         if mode.enabled {
             return true

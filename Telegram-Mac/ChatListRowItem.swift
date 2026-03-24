@@ -258,6 +258,15 @@ class ChatListRowItem: TableRowItem {
     
     private var shortBadgeNode:BadgeNode? = nil
     private var shortBadgeSelectedNode:BadgeNode? = nil
+    
+    private func makeFocusUnreadBadge(selected: Bool, fillColor: NSColor) -> BadgeNode {
+        let textColor = selected ? theme.chatList.badgeSelectedTextColor.withAlphaComponent(0.9) : theme.chatList.badgeTextColor.withAlphaComponent(0.78)
+        return BadgeNode(
+            .initialize(string: "•", color: textColor, font: .medium(7.0)),
+            fillColor.withAlphaComponent(0.92),
+            additionSize: NSMakeSize(3, 1)
+        )
+    }
 
 
     private let _animateArchive:Atomic<Bool> = Atomic(value: false)
@@ -463,7 +472,7 @@ class ChatListRowItem: TableRowItem {
         self.mode = .chat
         self.messages = messages
         self.chatListIndex = nil
-        self.activities = activities
+        self.activities = FocusProduct.isEnabled ? [] : activities
         self.context = context
         self.mentionsCount = nil
         self.reactionsCount = nil
@@ -502,7 +511,7 @@ class ChatListRowItem: TableRowItem {
         self.folders = nil
         self.tags = nil
         self.canPreviewChat = false
-        if let storyState = storyState, storyState.items.count > 0 {
+        if !FocusProduct.isEnabled, let storyState = storyState, storyState.items.count > 0 {
             let unseenCount: Int = storyState.items.reduce(0, {
                 $0 + ($1.unseenCount > 0 ? 1 : 0)
             })
@@ -512,7 +521,8 @@ class ChatListRowItem: TableRowItem {
         }
                 
         let titleText:NSMutableAttributedString = NSMutableAttributedString()
-        let _ = titleText.append(string: strings().chatListArchivedChats, color: theme.chatList.textColor, font: .medium(.title))
+        let archiveTitle = FocusProduct.isEnabled ? "Archive" : strings().chatListArchivedChats
+        let _ = titleText.append(string: archiveTitle, color: theme.chatList.textColor, font: .medium(.title))
         titleText.setSelected(color: theme.colors.underSelectedColor ,range: titleText.range)
         
         self.displayLayout = TextViewLayout(titleText, maximumNumberOfLines: 1)
@@ -566,11 +576,20 @@ class ChatListRowItem: TableRowItem {
         _ = _animateArchive.swap(animateGroup)
         
         if mutedCount > 0  {
-            badgeNode = BadgeNode(.initialize(string: "\(mutedCount)", color: theme.chatList.badgeTextColor, font: .medium(.small)), theme.chatList.badgeMutedBackgroundColor)
-            badgeSelectedNode = BadgeNode(.initialize(string: "\(mutedCount)", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
-            
-            shortBadgeNode = BadgeNode(.initialize(string: "\(mutedCount)", color: theme.chatList.badgeTextColor, font: .medium(.small)), theme.chatList.badgeMutedBackgroundColor)
-            shortBadgeSelectedNode = BadgeNode(.initialize(string: "\(mutedCount)", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+            if FocusProduct.isEnabled {
+                badgeNode = makeFocusUnreadBadge(selected: false, fillColor: theme.chatList.badgeMutedBackgroundColor)
+                badgeSelectedNode = makeFocusUnreadBadge(selected: true, fillColor: theme.chatList.badgeSelectedBackgroundColor)
+                
+                shortBadgeNode = makeFocusUnreadBadge(selected: false, fillColor: theme.chatList.badgeMutedBackgroundColor)
+                shortBadgeSelectedNode = makeFocusUnreadBadge(selected: true, fillColor: theme.chatList.badgeSelectedBackgroundColor)
+            } else {
+                let badgeLabel = "\(mutedCount)"
+                badgeNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeTextColor, font: .medium(.small)), theme.chatList.badgeMutedBackgroundColor)
+                badgeSelectedNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                
+                shortBadgeNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeTextColor, font: .medium(.small)), theme.chatList.badgeMutedBackgroundColor)
+                shortBadgeSelectedNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+            }
 
         }
         
@@ -602,7 +621,7 @@ class ChatListRowItem: TableRowItem {
             messageText = .initialize(string: strings().chatListArchiveStoryCountCountable(storyState.items.count), color: theme.chatList.grayTextColor, font: .normal(.text))
         }
         
-        if let messageText = messageText.trimmed.mutableCopy() as? NSMutableAttributedString, !messageText.string
+        if !FocusProduct.isEnabled, let messageText = messageText.trimmed.mutableCopy() as? NSMutableAttributedString, !messageText.string
             .isEmpty {
             self.messageLayout = .init(messageText, maximumNumberOfLines: 2)
             let selectedText:NSMutableAttributedString = messageText.mutableCopy() as! NSMutableAttributedString
@@ -706,6 +725,8 @@ class ChatListRowItem: TableRowItem {
 
     init(_ initialSize:NSSize, context: AccountContext, stableId: UIChatListEntryId, mode: Mode, messages: [Message], index: ChatListIndex? = nil, readState:EnginePeerReadCounters? = nil, draft:EngineChatList.Draft? = nil, pinnedType:ChatListPinnedType = .none, renderedPeer:EngineRenderedPeer, peerPresence: EnginePeer.Presence? = nil, forumTopicData: EngineChatList.ForumTopicData? = nil, forumTopicItems:[EngineChatList.ForumTopicData] = [], activities: [PeerListState.InputActivities.Activity] = [], highlightText: String? = nil, associatedGroupId: EngineChatList.Group = .root, isMuted:Bool = false, hasFailed: Bool = false, hasUnreadMentions: Bool = false, hasUnreadReactions: Bool = false, showBadge: Bool = true, filter: ChatListFilter = .allChats, hideStatus: ItemHideStatus? = nil, titleMode: TitleMode = .normal, appearMode: PeerListState.AppearMode = .normal, hideContent: Bool = false, getHideProgress:(()->CGFloat?)? = nil, selectedForum: PeerId? = nil, autoremoveTimeout: Int32? = nil, story: EngineChatList.StoryStats? = nil, openStory: @escaping(StoryInitialIndex?, Bool, Bool)->Void = { _, _, _ in }, storyState: EngineStorySubscriptions? = nil, isContact: Bool = false, displayAsTopics: Bool = false, folders: FilterData? = nil, canPreviewChat: Bool = false) {
         
+        let effActivities = FocusProduct.isEnabled ? [] : activities
+        let effStory: EngineChatList.StoryStats? = FocusProduct.isEnabled ? nil : story
         
         if !forumTopicItems.isEmpty {
             var bp = 0
@@ -738,6 +759,9 @@ class ChatListRowItem: TableRowItem {
         } else {
             self.isOnline = nil
         }
+        if FocusProduct.isEnabled {
+            self.isOnline = nil
+        }
         
         if let peer = renderedPeer.chatMainPeer?._asPeer() as? TelegramChannel, peer.flags.contains(.hasActiveVoiceChat) {
             self.hasActiveGroupCall = mode.threadId == nil
@@ -748,10 +772,10 @@ class ChatListRowItem: TableRowItem {
         self.chatListIndex = index
         self.renderedPeer = renderedPeer
         self.context = context
-        self.story = story
+        self.story = effStory
         self.openStory = openStory
         self.messages = messages
-        self.activities = activities
+        self.activities = effActivities
         self.pinnedType = pinnedType
         self.splitState = context.layout
         self.hideStatus = hideStatus
@@ -851,8 +875,13 @@ class ChatListRowItem: TableRowItem {
         }
         
         if let peer = peer {
-            self.isVerified = peer.isVerified
-            self.isPremium = peer.isPremium && peer.id != context.peerId
+            if FocusProduct.isEnabled {
+                self.isVerified = false
+                self.isPremium = false
+            } else {
+                self.isVerified = peer.isVerified
+                self.isPremium = peer.isPremium && peer.id != context.peerId
+            }
             self.isScam = peer.isScam
             self.isFake = peer.isFake
         } else {
@@ -866,7 +895,7 @@ class ChatListRowItem: TableRowItem {
         self.isMuted = isMuted
         self.readState = readState
         
-        if let story = story, peer?.id != context.peerId {
+        if !FocusProduct.isEnabled, let story = effStory, peer?.id != context.peerId {
             self.avatarStoryIndicator = .init(stats: story, presentation: theme, isRoundedRect: peer?.isForum == true)
         } else {
             self.avatarStoryIndicator = nil
@@ -889,7 +918,8 @@ class ChatListRowItem: TableRowItem {
                     text = peer?.displayTitle
                 }
             }
-            let _ = titleText.append(string: text, color: renderedPeer.peers[renderedPeer.peerId]?._asPeer() is TelegramSecretChat ? theme.chatList.secretChatTextColor : theme.chatList.textColor, font: .medium(.title))
+            let titleFont: NSFont = .medium(.title)
+            let _ = titleText.append(string: text, color: renderedPeer.peers[renderedPeer.peerId]?._asPeer() is TelegramSecretChat ? theme.chatList.secretChatTextColor : theme.chatList.textColor, font: titleFont)
             isTopic = false
         case let .topic(_, data):
             let _ = titleText.append(string: data.info.title, color: theme.chatList.textColor, font: .medium(.title))
@@ -907,7 +937,7 @@ class ChatListRowItem: TableRowItem {
             self.displaySelectedLayout = TextViewLayout(selected, maximumNumberOfLines: 1)
         }
                 
-        if !forumTopicItems.isEmpty, let message = messages.first, tags == nil {
+        if !FocusProduct.isEnabled, !forumTopicItems.isEmpty, let message = messages.first, tags == nil {
             self.topicsLayout = .init(context, message: message, items: forumTopicItems, draft: draft)
         }
     
@@ -938,7 +968,8 @@ class ChatListRowItem: TableRowItem {
             let date:NSMutableAttributedString = NSMutableAttributedString()
             var time:TimeInterval = TimeInterval(message.timestamp)
             time -= context.timeDifference
-            let range = date.append(string: DateUtils.string(forMessageListDate: Int32(time)), color: theme.colors.grayText, font: .normal(.short))
+            let dateColor = FocusProduct.isEnabled ? theme.colors.grayText.withAlphaComponent(0.78) : theme.colors.grayText
+            let range = date.append(string: DateUtils.string(forMessageListDate: Int32(time)), color: dateColor, font: .normal(.short))
             date.setSelected(color: theme.colors.underSelectedColor, range: range)
             self.date = date.copy() as? NSAttributedString
             
@@ -963,7 +994,7 @@ class ChatListRowItem: TableRowItem {
                 } else {
                     author = message.author
                 }
-                if let author = author, let peer = peer, peer as? TelegramUser == nil, !peer.isChannel, draft == nil {
+                if let author = author, let peer = peer, peer as? TelegramUser == nil, !peer.isChannel, draft == nil, !FocusProduct.isEnabled {
                     if !(message.extendedMedia is TelegramMediaAction) {
                         var peerText: String = (author.id == context.account.peerId ? "\(strings().chatListYou)" : author.displayTitle)
                         
@@ -1011,7 +1042,7 @@ class ChatListRowItem: TableRowItem {
                 var contentImageSpecs = self.contentImageSpecs
                 let contentImageSize = self.contentImageSize
                 
-                if draft == nil, !isSecret, forumTopicItems.isEmpty {
+                if draft == nil, !isSecret, forumTopicItems.isEmpty, !FocusProduct.isEnabled {
                     var index: Int32 = 0
                     let insert:(Message, Media, Bool)->Void = { message, media, increment in
                         var message = message
@@ -1112,19 +1143,37 @@ class ChatListRowItem: TableRowItem {
             let isMuted = isMuted || (readState?.isMuted ?? false)
             
             if let unreadCount = readState?.count, unreadCount > 0, mentionsCount == nil || (unreadCount > 1 || mentionsCount! != unreadCount)  {
-
-                badgeNode = BadgeNode(.initialize(string: "\(unreadCount)", color: theme.chatList.badgeTextColor, font: .medium(.small)), isMuted ? theme.chatList.badgeMutedBackgroundColor : theme.chatList.badgeBackgroundColor)
-                badgeSelectedNode = BadgeNode(.initialize(string: "\(unreadCount)", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
-                
-                shortBadgeNode = BadgeNode(.initialize(string: "\(unreadCount)", color: theme.chatList.badgeTextColor, font: .medium(.small)), isMuted ? theme.chatList.badgeMutedBackgroundColor : theme.chatList.badgeBackgroundColor)
-                shortBadgeSelectedNode = BadgeNode(.initialize(string: "\(unreadCount)", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                let badgeBg = (FocusProduct.isEnabled || isMuted) ? theme.chatList.badgeMutedBackgroundColor : theme.chatList.badgeBackgroundColor
+                if FocusProduct.isEnabled {
+                    badgeNode = makeFocusUnreadBadge(selected: false, fillColor: badgeBg)
+                    badgeSelectedNode = makeFocusUnreadBadge(selected: true, fillColor: theme.chatList.badgeSelectedBackgroundColor)
+                    
+                    shortBadgeNode = makeFocusUnreadBadge(selected: false, fillColor: badgeBg)
+                    shortBadgeSelectedNode = makeFocusUnreadBadge(selected: true, fillColor: theme.chatList.badgeSelectedBackgroundColor)
+                } else {
+                    let badgeLabel = "\(unreadCount)"
+                    badgeNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeTextColor, font: .medium(.small)), badgeBg)
+                    badgeSelectedNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                    
+                    shortBadgeNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeTextColor, font: .medium(.small)), badgeBg)
+                    shortBadgeSelectedNode = BadgeNode(.initialize(string: badgeLabel, color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                }
 
             } else if isUnreadMarked && mentionsCount == nil {
-                badgeNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeTextColor, font: .medium(.small)), isMuted ? theme.chatList.badgeMutedBackgroundColor : theme.chatList.badgeBackgroundColor)
-                badgeSelectedNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
-                
-                shortBadgeNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeTextColor, font: .medium(.small)), isMuted ? theme.chatList.badgeMutedBackgroundColor : theme.chatList.badgeBackgroundColor)
-                shortBadgeSelectedNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                let badgeBg = isMuted ? theme.chatList.badgeMutedBackgroundColor : theme.chatList.badgeBackgroundColor
+                if FocusProduct.isEnabled {
+                    badgeNode = makeFocusUnreadBadge(selected: false, fillColor: badgeBg)
+                    badgeSelectedNode = makeFocusUnreadBadge(selected: true, fillColor: theme.chatList.badgeSelectedBackgroundColor)
+                    
+                    shortBadgeNode = makeFocusUnreadBadge(selected: false, fillColor: badgeBg)
+                    shortBadgeSelectedNode = makeFocusUnreadBadge(selected: true, fillColor: theme.chatList.badgeSelectedBackgroundColor)
+                } else {
+                    badgeNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeTextColor, font: .medium(.small)), badgeBg)
+                    badgeSelectedNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                    
+                    shortBadgeNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeTextColor, font: .medium(.small)), badgeBg)
+                    shortBadgeSelectedNode = BadgeNode(.initialize(string: " ", color: theme.chatList.badgeSelectedTextColor, font: .medium(.small)), theme.chatList.badgeSelectedBackgroundColor)
+                }
 
             }
         }
@@ -1139,7 +1188,7 @@ class ChatListRowItem: TableRowItem {
             presenceManager?.reset(presence: presence, timeDifference: Int32(context.timeDifference))
         }
         
-        if forumTopicItems.isEmpty || tags != nil {
+        if !FocusProduct.isEnabled && (forumTopicItems.isEmpty || tags != nil) {
             var messageText: NSAttributedString?
             var textCutout: TextViewCutout?
             if case let .ad(promo) = pinnedType, message == nil {
@@ -1174,7 +1223,7 @@ class ChatListRowItem: TableRowItem {
         _ = makeSize(initialSize.width, oldWidth: 0)
         
         
-        if let peer = peer, peer.isPremium, peer.id != context.peerId, peer.hasVideo, !isLite(.animations) {
+        if !FocusProduct.isEnabled, let peer = peer, peer.isPremium, peer.id != context.peerId, peer.hasVideo, !isLite(.animations) {
             self.photos = syncPeerPhotos(peerId: peer.id).map { $0.value }
             let signal = peerPhotos(context: context, peerId: peer.id, force: false) |> deliverOnMainQueue
             peerPhotosDisposable.set(signal.start(next: { [weak self] photos in
@@ -1189,7 +1238,24 @@ class ChatListRowItem: TableRowItem {
         }
     }
     
-    let margin:CGFloat = 9
+    /// Inbox row padding. Focus fork uses tighter density (7pt vs stock 9pt).
+    let margin: CGFloat = 7
+
+    /// In focus mode, timestamps are inset this many points from the window right edge instead of touching it.
+    static let focusInboxRightInset: CGFloat = 32
+
+    /// Right trailing edge of the timestamp area.
+    func focusInboxDateTrailingX(contentWidth: CGFloat) -> CGFloat {
+        guard FocusProduct.isEnabled else {
+            return contentWidth - margin
+        }
+        return contentWidth - ChatListRowItem.focusInboxRightInset
+    }
+
+    /// X origin for the date text so its trailing edge aligns with `focusInboxDateTrailingX`.
+    func focusInboxDateOriginX(dateWidth: CGFloat, contentWidth: CGFloat) -> CGFloat {
+        focusInboxDateTrailingX(contentWidth: contentWidth) - dateWidth
+    }
     
     
     var isPinned: Bool {
@@ -1301,7 +1367,9 @@ class ChatListRowItem: TableRowItem {
             offset += 10
         }
         offset += 5
-        return max(200, size.width) - margin * 3 - dateSize - (isOutMessage ? isRead ? 20 : 12 : 0) - offset
+        let out: CGFloat = isOutMessage ? (isRead ? 20 : 12) : 0
+        let rightPad: CGFloat = FocusProduct.isEnabled ? ChatListRowItem.focusInboxRightInset : margin
+        return max(200, size.width) - margin * 2 - rightPad - dateSize - out - offset
     }
     
     var chatNameWidth:CGFloat {
@@ -1326,7 +1394,8 @@ class ChatListRowItem: TableRowItem {
             w += 40
         }
 
-        return max(200, size.width) - margin * 3 - w - (isOutMessage ? isRead ? 20 : 12 : 0)
+        let out: CGFloat = isOutMessage ? (isRead ? 20 : 12) : 0
+        return max(200, size.width) - margin * 3 - w - out
     }
     
     var messageWidth:CGFloat {
@@ -1360,7 +1429,8 @@ class ChatListRowItem: TableRowItem {
             w += CGFloat(contentImageSpecs.count) * 16
         }
         
-        return (max(200, size.width) - margin * 3) - w - (chatNameLayout != nil ? textLeftCutout : 0)
+        let cut: CGFloat = chatNameLayout != nil ? textLeftCutout : 0
+        return (max(200, size.width) - margin * 3) - w - cut
     }
     
     var inputActivityWidth: CGFloat {
@@ -1379,10 +1449,14 @@ class ChatListRowItem: TableRowItem {
         }
         w += (leftInset - 20)
         
-        return (max(200, size.width) - margin * 3) - w - (chatNameLayout != nil ? textLeftCutout : 0)
+        let cut: CGFloat = chatNameLayout != nil ? textLeftCutout : 0
+        return (max(200, size.width) - margin * 3) - w - cut
     }
     
     var leftInset:CGFloat {
+        if FocusProduct.isEnabled {
+            return 10
+        }
         switch mode {
         case .chat, .savedMessages:
             return 50 + (10 * 2.0)
@@ -2257,7 +2331,7 @@ class ChatListRowItem: TableRowItem {
         
         switch mode {
         case .chat, .savedMessages:
-            return 70
+            return FocusProduct.isEnabled ? 50 : 70
         case .topic:
             return 53 + (displayLayout?.layoutSize.height ?? 17)
         }
