@@ -345,9 +345,6 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
         
         entries.append(.section(sectionId: sectionId))
         sectionId += 1
-    } else {
-        entries.append(.section(sectionId: sectionId))
-        sectionId += 1
     }
     
     

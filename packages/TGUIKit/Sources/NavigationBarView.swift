@@ -57,7 +57,7 @@ public class NavigationBarView: View {
     override public func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
         bottomBorder.backgroundColor = presentation.colors.border
-        backgroundColor = presentation.colors.background
+        backgroundColor = presentation.colors.listBackground
     }
     
     required public init?(coder: NSCoder) {

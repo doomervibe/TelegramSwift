@@ -15,6 +15,12 @@ import SwiftSignalKit
 import InAppSettings
 import FetchManager
 
+/// Matches `GeneralContainableRowView.maxBlockWidth` so the peer list column aligns with settings tables.
+private let focusPeerListContentMaxWidth: CGFloat = 600
+private let focusPeerListContentMaxHeight: CGFloat = 900
+private let focusPeerListColumnVerticalMargin: CGFloat = 8
+private let focusPeerListColumnCornerRadius: CGFloat = 12
+
 struct PeerListHiddenItems : Equatable {
     var archive: ItemHideStatus
     var generalTopic: ItemHideStatus?
@@ -1059,6 +1065,9 @@ class PeerListContainerView : Control {
     
     let backgroundView = View(frame: NSZeroRect)
     
+    /// Gray rounded plate behind the peer list column (Focus + plain mode only).
+    private let focusColumnChromeView = View(frame: .zero)
+    
     let tableView = TableView(frame:NSZeroRect, drawBorder: true)
     
     
@@ -1073,6 +1082,9 @@ class PeerListContainerView : Control {
     var focusCategoryOverride: String?
     var focusAlwaysShowSearch: Bool = false
     
+    /// Set in `updateLayout` when the Focus rounded column is active (for `searchViewRect` and overlays).
+    private var focusColumnFrame: CGRect = .zero
+    
     private var webapps: WebappsControl?
         
     
@@ -1080,6 +1092,9 @@ class PeerListContainerView : Control {
         var y = navigationHeight
         if let foldersItem = foldersItem {
             y -= foldersItem.height
+        }
+        if !focusColumnFrame.isEmpty {
+            return NSMakeRect(focusColumnFrame.minX, focusColumnFrame.minY + max(0, y), focusColumnFrame.width, focusColumnFrame.height - y)
         }
         return NSMakeRect(0, max(0, y), frame.width, frame.height - y)
     }
@@ -1098,7 +1113,13 @@ class PeerListContainerView : Control {
         
         backgroundView.layer?.opacity = 0
         
+        focusColumnChromeView.isHidden = true
+        focusColumnChromeView.wantsLayer = true
+        focusColumnChromeView.layer?.cornerRadius = focusPeerListColumnCornerRadius
+        focusColumnChromeView.layer?.masksToBounds = true
+        
         addSubview(backgroundView)
+        addSubview(focusColumnChromeView)
         addSubview(tableView)
         addSubview(containerView)
         
@@ -1610,8 +1631,10 @@ class PeerListContainerView : Control {
 
         borderView.backgroundColor = theme.colors.border
                 
-        self.backgroundColor = theme.colors.background
+        self.backgroundColor = theme.colors.listBackground
         self.backgroundView.backgroundColor = theme.colors.listBackground
+        
+        focusColumnChromeView.backgroundColor = theme.colors.background
                 
         searchView.searchTheme = .init(theme.search.backgroundColor, theme.search.searchImage, theme.search.clearImage, {
             return strings().chatListSearchPlaceholder
@@ -1680,10 +1703,27 @@ class PeerListContainerView : Control {
         
         
         guard let state = self.state, let arguments = self.arguments else {
+            focusColumnFrame = .zero
             return
         }
         
-        var maxTitleWidth: CGFloat = max(size.width, 300) - 60
+        let contentW: CGFloat
+        let contentX: CGFloat
+        let columnY: CGFloat
+        let columnH: CGFloat
+        if FocusProduct.isEnabled && state.splitState != .minimisize && state.mode == .plain {
+            contentW = min(focusPeerListContentMaxWidth, size.width)
+            contentX = floorToScreenPixels(backingScaleFactor, (size.width - contentW) / 2)
+            columnH = min(focusPeerListContentMaxHeight, size.height - focusPeerListColumnVerticalMargin * 2)
+            columnY = floorToScreenPixels(backingScaleFactor, (size.height - columnH) / 2)
+        } else {
+            contentW = state.splitState == .minimisize ? 70 : size.width
+            contentX = 0
+            columnH = size.height
+            columnY = 0
+        }
+        
+        var maxTitleWidth: CGFloat = max(contentW, 300) - 60
         if let compose = self.compose {
             maxTitleWidth -= compose.frame.width
         }
@@ -1700,9 +1740,9 @@ class PeerListContainerView : Control {
         
         var inset: CGFloat = 0
         
-        let containerSize = NSMakeSize(state.splitState == .minimisize ? 70 : size.width, offset)
+        let containerSize = NSMakeSize(contentW, offset)
                 
-        transition.updateFrame(view: self.containerView, frame: NSMakeRect(0, inset, containerSize.width, offset))
+        transition.updateFrame(view: self.containerView, frame: NSMakeRect(contentX, columnY + inset, containerSize.width, offset))
         self.containerView.isHidden = offset <= 0
         
         transition.updateFrame(view: self.statusContainer, frame: NSMakeRect(0, 0, containerSize.width, statusHeight))
@@ -1712,7 +1752,7 @@ class PeerListContainerView : Control {
 
         transition.updateFrame(view: self.backgroundView, frame: size.bounds)
         
-        transition.updateFrame(view: self.borderView, frame: CGRect(origin: CGPoint.init(x: 0, y: max(0, navigationHeight - .borderSize)), size: CGSize(width: size.width, height: .borderSize)))
+        transition.updateFrame(view: self.borderView, frame: CGRect(origin: CGPoint.init(x: contentX, y: columnY + max(0, navigationHeight - .borderSize)), size: CGSize(width: contentW, height: .borderSize)))
         transition.updateAlpha(view: borderView, alpha: (state.searchState == .Focus || navigationHeight <= 0) ? 0 : 1)
 
 
@@ -1731,12 +1771,12 @@ class PeerListContainerView : Control {
 
 
         var searchX: CGFloat = 10
-        var searchWidth: CGFloat = size.width - 10 * 2
+        var searchWidth: CGFloat = contentW - 10 * 2
         if state.isContacts, let contactsSort = self.contactsSort {
             let sortY = searchY + floorToScreenPixels(backingScaleFactor, (componentSize.height - contactsSort.frame.height) / 2)
             transition.updateFrame(view: contactsSort, frame: NSMakeRect(10, sortY, contactsSort.frame.width, contactsSort.frame.height))
             searchX = contactsSort.frame.maxX + 10
-            searchWidth = max(120, size.width - searchX - 10)
+            searchWidth = max(120, contentW - searchX - 10)
         }
         
         let searchRect = NSMakeRect(searchX, searchY, searchWidth, componentSize.height)
@@ -1751,11 +1791,11 @@ class PeerListContainerView : Control {
         
 
 
-        transition.updateFrame(view: tableView, frame: NSMakeRect(0, 0, size.width, size.height - bottomInset))
+        transition.updateFrame(view: tableView, frame: NSMakeRect(contentX, columnY, contentW, columnH - bottomInset))
         
         
         if let downloads = downloads {
-            let rect = NSMakeRect(0, size.height - downloads.frame.height, size.width - .borderSize, downloads.frame.height)
+            let rect = NSMakeRect(contentX, columnY + columnH - downloads.frame.height, contentW - .borderSize, downloads.frame.height)
             transition.updateFrame(view: downloads, frame: rect)
         }
         
@@ -1773,7 +1813,7 @@ class PeerListContainerView : Control {
         }
         
         if let view = forumTitle {
-            transition.updateFrame(view: view, frame: CGRect(origin: .zero, size: NSMakeSize(size.width, 50)))
+            transition.updateFrame(view: view, frame: CGRect(origin: NSMakePoint(contentX, columnY), size: NSMakeSize(contentW, 50)))
             transition.updateAlpha(view: view, alpha: 1 - progress)
         }
         
@@ -1804,12 +1844,12 @@ class PeerListContainerView : Control {
         }
         
         if let view = self.scrollerView {
-            transition.updateFrame(view: view, frame: NSMakeRect(size.width - view.frame.width - 10, size.height - view.frame.height - 10, view.frame.width, view.frame.height))
+            transition.updateFrame(view: view, frame: NSMakeRect(contentX + contentW - view.frame.width - 10, columnY + columnH - view.frame.height - 10, view.frame.width, view.frame.height))
         }
         
 
         let titlePlusStorySize = titleView.frame.width + (59)
-        var titlePlusStoryStartX = (size.width - titlePlusStorySize) / 2
+        var titlePlusStoryStartX = (contentW - titlePlusStorySize) / 2
         titlePlusStoryStartX = max(arguments.navigationBarLeftPosition() + 20, titlePlusStoryStartX)
 
 //        if let back = backButton {
@@ -1819,7 +1859,7 @@ class PeerListContainerView : Control {
         let titleXStart = titlePlusStoryStartX + (59)
         
         let storyXEnd: CGFloat = 0
-        let titleXEnd = (size.width - titleView.size.width) / 2
+        let titleXEnd = (contentW - titleView.size.width) / 2
         
         
         
@@ -1837,30 +1877,54 @@ class PeerListContainerView : Control {
         transition.updateAlpha(view: titleView, alpha: progress)
 
         if let storiesItem = storiesItem, let view = storiesView {
-            let size = NSMakeSize(size.width, storiesItem.height)
+            let storyRowSize = NSMakeSize(contentW, storiesItem.height)
                         
-            var rect = CGRect(origin: NSMakePoint(storyX, 10 + storiesItem.getInterfaceState().progress * 40), size: size)
+            var rect = CGRect(origin: NSMakePoint(contentX + storyX, columnY + 10 + storiesItem.getInterfaceState().progress * 40), size: storyRowSize)
                         
             if storiesItem.itemsCount < 3 {
                 rect.origin.x += (1 - storiesItem.getInterfaceState().progress) * (StoryListChatListRowItem.smallSize.width / 2 * CGFloat(3 - storiesItem.itemsCount))
             }
             transition.updateFrame(view: view, frame: rect)
             view.set(item: storiesItem, animated: transition.isAnimated)
-            view.updateLayout(size: size, transition: transition)
+            view.updateLayout(size: storyRowSize, transition: transition)
             transition.updateAlpha(view: view, alpha: progress)
         }
         
         if let foldersItem = foldersItem, let view = foldersView {
-            let controlSize = NSMakeSize(size.width, foldersItem.height)
+            let controlSize = NSMakeSize(contentW, foldersItem.height)
             
-            let rect = CGRect(origin: NSMakePoint(0, navigationHeight - controlSize.height), size: controlSize)
+            let rect = CGRect(origin: NSMakePoint(contentX, columnY + navigationHeight - controlSize.height), size: controlSize)
                         
             transition.updateFrame(view: view, frame: rect)
             view.set(item: foldersItem, animated: transition.isAnimated)
             
-            view.updateLayout(size: size, transition: transition)
+            view.updateLayout(size: controlSize, transition: transition)
         }
         transition.updateAlpha(view: self.backgroundView, alpha: 1 - progress)
+
+        if FocusProduct.isEnabled && state.splitState != .minimisize && state.mode == .plain {
+            let columnFrame = NSMakeRect(contentX, columnY, contentW, columnH)
+            focusColumnFrame = columnFrame
+            transition.updateFrame(view: focusColumnChromeView, frame: columnFrame)
+            focusColumnChromeView.isHidden = false
+            let listWhite = presentation.colors.background
+            containerView.backgroundColor = listWhite
+            focusColumnChromeView.backgroundColor = listWhite
+            tableView.getBackgroundColor = { presentation.colors.background }
+            tableView.layer?.backgroundColor = presentation.colors.background.cgColor
+            tableView.wantsLayer = true
+            tableView.layer?.cornerRadius = focusPeerListColumnCornerRadius
+            tableView.layer?.masksToBounds = true
+        } else {
+            focusColumnFrame = .zero
+            focusColumnChromeView.isHidden = true
+            transition.updateFrame(view: focusColumnChromeView, frame: .zero)
+            containerView.backgroundColor = presentation.colors.background
+            tableView.getBackgroundColor = { .clear }
+            tableView.layer?.backgroundColor = NSColor.clear.cgColor
+            tableView.layer?.cornerRadius = 0
+            tableView.layer?.masksToBounds = false
+        }
 
         self.updateScrollerInset(animated: transition.isAnimated)
 
