@@ -12,7 +12,7 @@ import InAppSettings
 
 // MARK: - Category enum
 
-enum FocusCategory: Equatable {
+enum FocusCategory: Hashable {
     case inbox
     case digest        // kept for filter compat; not shown in strip
     case channels      // replaces digest in the strip (unread channels by default)

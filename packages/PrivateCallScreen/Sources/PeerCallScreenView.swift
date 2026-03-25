@@ -266,7 +266,7 @@ final class PeerCallScreenView : Control {
 
         addSubview(statusView)
         
-        settingsView.set(image: NSImage(resource: .icSettings).precomposed(.white), for: .Normal)
+        settingsView.set(image: PrivateCallAssets.image(named: "ic_settings").precomposed(.white), for: .Normal)
         settingsView.autohighlight = false
         settingsView.scaleOnClick = true
         settingsView.sizeToFit()
@@ -274,7 +274,7 @@ final class PeerCallScreenView : Control {
         addSubview(settingsView)
         
         
-        addPeerView.set(image: NSImage(resource: .icAddPeople).precomposed(.white), for: .Normal)
+        addPeerView.set(image: PrivateCallAssets.image(named: "ic_add_people").precomposed(.white), for: .Normal)
         addPeerView.autohighlight = false
         addPeerView.scaleOnClick = true
         addPeerView.sizeToFit()

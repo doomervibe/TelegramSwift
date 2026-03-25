@@ -10,7 +10,7 @@ import TGUIKit
 import AppKit
 import Localization
 
-private let micro = NSImage(resource: .icMicrophoneoff).precomposed(.white)
+private let micro = PrivateCallAssets.image(named: "ic_microphoneoff").precomposed(.white)
 
 final class PeerCallTooltipStatusView : NSVisualEffectView {
     

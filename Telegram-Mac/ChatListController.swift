@@ -147,6 +147,9 @@ enum UIChatListEntryId : Hashable {
     case birthdays
     case grace
     case custom
+    /// Focus fork: distinct id so table diff / `proccessEntries` item cache do not collapse
+    /// multiple `.custom` rows or reuse the wrong row when the strip category changes.
+    case focusShowAll(FocusCategory)
     case sectionHeader(String)
     /// Focus Stories tab: horizontal story rail (stable row identity).
     case storiesRail
@@ -344,6 +347,14 @@ protocol UIChatListTextAction {
     var canDismiss: Bool { get }
     
     func isEqual(_ rhs: any UIChatListTextAction) -> Bool
+
+    /// When non-nil, chat list `stableId` uses `UIChatListEntryId.focusShowAll` so the table
+    /// does not merge unrelated `.custom` rows (see `proccessEntries` item cache).
+    var focusShowAllCategory: FocusCategory? { get }
+}
+
+extension UIChatListTextAction {
+    var focusShowAllCategory: FocusCategory? { nil }
 }
 
 enum UIChatListEntry : Identifiable, Comparable {
@@ -552,7 +563,10 @@ enum UIChatListEntry : Identifiable, Comparable {
             return .suspicious
         case .birthdays:
             return .birthdays
-        case .custom:
+        case let .custom(action):
+            if let c = action.focusShowAllCategory {
+                return .focusShowAll(c)
+            }
             return .custom
         case .grace:
             return .grace
@@ -788,12 +802,14 @@ struct FilterData : Equatable {
 // Injected as a .custom entry at the bottom of unread-filtered lists so the user
 // can momentarily reveal all chats/channels without switching categories.
 struct UIShowAllAction: UIChatListTextAction {
+    let category: FocusCategory
     let text: NSAttributedString
     let info: NSAttributedString
     let canDismiss: Bool = false
     private let _action: () -> Void
 
     init(category: FocusCategory) {
+        self.category = category
         switch category {
         case .channels:
             text = .initialize(string: "Show all channels", color: theme.colors.accent, font: .medium(.text))
@@ -808,18 +824,23 @@ struct UIShowAllAction: UIChatListTextAction {
     func dismiss() {}
 
     func isEqual(_ rhs: any UIChatListTextAction) -> Bool {
-        rhs is UIShowAllAction
+        guard let other = rhs as? UIShowAllAction else { return false }
+        return other.category == category
     }
+
+    var focusShowAllCategory: FocusCategory? { category }
 }
 
 // Variant that holds a real callback (used when the action is actually triggered).
 struct UIShowAllActionLive: UIChatListTextAction {
+    let category: FocusCategory
     let text: NSAttributedString
     let info: NSAttributedString
     let canDismiss: Bool = false
     private let _action: () -> Void
 
     init(category: FocusCategory, onShowAll: @escaping () -> Void) {
+        self.category = category
         switch category {
         case .channels:
             text = .initialize(string: "Show all channels →", color: theme.colors.accent, font: .medium(.text))
@@ -834,8 +855,11 @@ struct UIShowAllActionLive: UIChatListTextAction {
     func dismiss() {}
 
     func isEqual(_ rhs: any UIChatListTextAction) -> Bool {
-        rhs is UIShowAllActionLive
+        guard let other = rhs as? UIShowAllActionLive else { return false }
+        return other.category == category
     }
+
+    var focusShowAllCategory: FocusCategory? { category }
 }
 
 

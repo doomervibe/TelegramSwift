@@ -103,8 +103,8 @@ func makeActiveAction(_ image: NSImage) -> CGImage {
     }, scale: System.backingScale)!
 }
 
-func makeAction(type: PeerCallActionType, text: String, resource: ImageResource, active: Bool = false, enabled: Bool = true, loading: Bool = false, interactive: Bool = true, attract: Bool = false, action: @escaping()->Void) -> PeerCallAction {
-    let image = NSImage(resource: resource)
+func makeAction(type: PeerCallActionType, text: String, imageName: String, active: Bool = false, enabled: Bool = true, loading: Bool = false, interactive: Bool = true, attract: Bool = false, action: @escaping()->Void) -> PeerCallAction {
+    let image = PrivateCallAssets.image(named: imageName)
     return .init(stableId: type, text: text, normal: !interactive ? image._cgImage! : makeNormalAction(image), activeImage: !interactive ? nil : makeActiveAction(image), active: active, loading: loading, enabled: enabled, interactive: interactive, attract: attract, action: action)
 }
 

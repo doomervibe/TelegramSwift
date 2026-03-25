@@ -583,9 +583,20 @@ class MainViewController: TelegramViewController {
     
     private func updateTabsIfNeeded() {
         if FocusProduct.isEnabled {
+            self.previousTheme = theme
+            self.previousIconColor = theme.colors.accentIcon
             return
         }
         if !tabController.isEmpty && (previousTheme?.colors != theme.colors ||  previousIconColor != theme.colors.accentIcon) {
+            // Stock layout: contacts / [calls] / chats / settings. Focus fork only adds three tabs
+            // (chats, search, contacts) and never inserts the Calls tab — but `showCallTabs` can
+            // still be true, so without this guard `tab(at:)` hits index 3 and traps.
+            let requiredTabCount = showCallTabs ? 4 : 3
+            guard tabController.count >= requiredTabCount else {
+                self.previousTheme = theme
+                self.previousIconColor = theme.colors.accentIcon
+                return
+            }
             var index: Int = 0
             tabController.replace(tab: tabController.tab(at: index).withUpdatedImages(theme.icons.tab_contacts, theme.icons.tab_contacts_active), at: index)
             index += 1
@@ -605,6 +616,7 @@ class MainViewController: TelegramViewController {
     private var previousIndex: Int? = nil
     
     func checkSettings(_ index:Int) {
+        guard index >= 0, index < tabController.count else { return }
         let isSettings = tabController.tab(at: index).controller is AccountViewController
         
         let navigation = context.bindings.rootNavigation()

@@ -962,6 +962,12 @@
 		27F2BBCF27BEA4A400A37463 /* Auth_AwaitingReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F2BBCE27BEA4A400A37463 /* Auth_AwaitingReset.swift */; };
 		27F2BBD127BF694800A37463 /* qrcode_matrix.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 27F2BBD027BF694800A37463 /* qrcode_matrix.tgs */; };
 		27F2BBD327BF8CD300A37463 /* Auth_Signup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F2BBD227BF8CD300A37463 /* Auth_Signup.swift */; };
+		27F3000126F4000100000001 /* FocusMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000002 /* FocusMode.swift */; };
+		27F3000126F4000100000003 /* ChatFocusMediaPlaceholderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */; };
+		27F3000126F4000100000005 /* FocusDigestController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000006 /* FocusDigestController.swift */; };
+		27F3000126F4000100000007 /* FocusCategoryStripController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000008 /* FocusCategoryStripController.swift */; };
+		27F3000126F400010000000D /* FocusAvatarHoverManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F400010000000C /* FocusAvatarHoverManager.swift */; };
+		27F3000126F400010000000F /* FocusMediaSearchRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */; };
 		27F37A262850F8F200AC8B90 /* voice_dots.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 27F37A252850F8F200AC8B90 /* voice_dots.tgs */; };
 		27F37A282857A92000AC8B90 /* PremiumDemoPhoneControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F37A272857A92000AC8B90 /* PremiumDemoPhoneControl.swift */; };
 		27F3B75427391E6B00B81F10 /* TelegramIconsTheme in Frameworks */ = {isa = PBXBuildFile; productRef = 27F3B75327391E6B00B81F10 /* TelegramIconsTheme */; };
@@ -1279,12 +1285,6 @@
 		C22A899F1EBCC2AA005B963D /* CallNavigationHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22A899E1EBCC2AA005B963D /* CallNavigationHeaderView.swift */; };
 		C22E06321D8044CC00A11C88 /* ChatListController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22E06311D8044CC00A11C88 /* ChatListController.swift */; };
 		C22E063D1D80929400A11C88 /* ChatListRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22E063C1D80929400A11C88 /* ChatListRowItem.swift */; };
-		27F3000126F4000100000001 /* FocusMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000002 /* FocusMode.swift */; };
-		27F3000126F4000100000003 /* ChatFocusMediaPlaceholderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */; };
-		27F3000126F4000100000005 /* FocusDigestController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000006 /* FocusDigestController.swift */; };
-		27F3000126F4000100000007 /* FocusCategoryStripController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F4000100000008 /* FocusCategoryStripController.swift */; };
-		27F3000126F400010000000D /* FocusAvatarHoverManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3000126F400010000000C /* FocusAvatarHoverManager.swift */; };
-		27F3000126F400010000000F /* FocusMediaSearchRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */; };
 		C22EBCB81DFAB36A0034C435 /* ChatMapRowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22EBCB71DFAB36A0034C435 /* ChatMapRowItem.swift */; };
 		C22EBCBA1DFAB64F0034C435 /* ChatMapContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22EBCB91DFAB64F0034C435 /* ChatMapContentView.swift */; };
 		C22EE6191E66ECB200334C38 /* ReportReasonModalController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22EE6181E66ECB200334C38 /* ReportReasonModalController.swift */; };
@@ -1674,6 +1674,7 @@
 		D0E82E002500F10E00E09A20 /* MergedAvatarsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E82DFF2500F10E00E09A20 /* MergedAvatarsView.swift */; };
 		D0FCA7622434867400B72F18 /* PeerInfoHeadItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FCA7612434867400B72F18 /* PeerInfoHeadItem.swift */; };
 		D0FFC4AC23E184BA0044D305 /* ChatListFilterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FFC4AB23E184BA0044D305 /* ChatListFilterController.swift */; };
+		E950EB6E2F73F04000DFF796 /* ChatListController+CategoryUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E950EB6D2F73F04000DFF796 /* ChatListController+CategoryUI.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -2631,6 +2632,12 @@
 		27F2BBCE27BEA4A400A37463 /* Auth_AwaitingReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Auth_AwaitingReset.swift; sourceTree = "<group>"; };
 		27F2BBD027BF694800A37463 /* qrcode_matrix.tgs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = qrcode_matrix.tgs; sourceTree = "<group>"; };
 		27F2BBD227BF8CD300A37463 /* Auth_Signup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Auth_Signup.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000002 /* FocusMode.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusMode.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatFocusMediaPlaceholderItem.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000006 /* FocusDigestController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusDigestController.swift; sourceTree = "<group>"; };
+		27F3000126F4000100000008 /* FocusCategoryStripController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusCategoryStripController.swift; sourceTree = "<group>"; };
+		27F3000126F400010000000C /* FocusAvatarHoverManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusAvatarHoverManager.swift; sourceTree = "<group>"; };
+		27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusMediaSearchRowItem.swift; sourceTree = "<group>"; };
 		27F37A252850F8F200AC8B90 /* voice_dots.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = voice_dots.tgs; sourceTree = "<group>"; };
 		27F37A272857A92000AC8B90 /* PremiumDemoPhoneControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumDemoPhoneControl.swift; sourceTree = "<group>"; };
 		27F3B75027391B1000B81F10 /* MergeLists */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MergeLists; path = packages/MergeLists; sourceTree = "<group>"; };
@@ -2956,12 +2963,6 @@
 		C22A899E1EBCC2AA005B963D /* CallNavigationHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CallNavigationHeaderView.swift; sourceTree = "<group>"; };
 		C22E06311D8044CC00A11C88 /* ChatListController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatListController.swift; sourceTree = "<group>"; };
 		C22E063C1D80929400A11C88 /* ChatListRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatListRowItem.swift; sourceTree = "<group>"; };
-		27F3000126F4000100000002 /* FocusMode.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusMode.swift; sourceTree = "<group>"; };
-		27F3000126F4000100000004 /* ChatFocusMediaPlaceholderItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatFocusMediaPlaceholderItem.swift; sourceTree = "<group>"; };
-		27F3000126F4000100000006 /* FocusDigestController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusDigestController.swift; sourceTree = "<group>"; };
-		27F3000126F4000100000008 /* FocusCategoryStripController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusCategoryStripController.swift; sourceTree = "<group>"; };
-		27F3000126F400010000000C /* FocusAvatarHoverManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusAvatarHoverManager.swift; sourceTree = "<group>"; };
-		27F300012AB40001000000E0 /* FocusMediaSearchRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FocusMediaSearchRowItem.swift; sourceTree = "<group>"; };
 		C22EBCB71DFAB36A0034C435 /* ChatMapRowItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatMapRowItem.swift; sourceTree = "<group>"; };
 		C22EBCB91DFAB64F0034C435 /* ChatMapContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatMapContentView.swift; sourceTree = "<group>"; };
 		C22EE6181E66ECB200334C38 /* ReportReasonModalController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReportReasonModalController.swift; sourceTree = "<group>"; };
@@ -3370,6 +3371,7 @@
 		D0E82DFF2500F10E00E09A20 /* MergedAvatarsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergedAvatarsView.swift; sourceTree = "<group>"; };
 		D0FCA7612434867400B72F18 /* PeerInfoHeadItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerInfoHeadItem.swift; sourceTree = "<group>"; };
 		D0FFC4AB23E184BA0044D305 /* ChatListFilterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListFilterController.swift; sourceTree = "<group>"; };
+		E950EB6D2F73F04000DFF796 /* ChatListController+CategoryUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatListController+CategoryUI.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -6767,6 +6769,7 @@
 				D098C71F1D7E175A007784E4 /* Info.plist */,
 				C253A9721D92F9F100CDC850 /* Localizable.strings */,
 				C252532B1DF043D800ADBC98 /* resources */,
+				E950EB6D2F73F04000DFF796 /* ChatListController+CategoryUI.swift */,
 			);
 			path = "Telegram-Mac";
 			sourceTree = "<group>";
@@ -8239,6 +8242,7 @@
 				2744018526E6344E0035C55D /* WidgetRecentPeersController.swift in Sources */,
 				27AAAD57299F5F9E00F70A9A /* LiteModeController.swift in Sources */,
 				C25911371DF1A68200671E72 /* ChatInputRecordingView.swift in Sources */,
+				E950EB6E2F73F04000DFF796 /* ChatListController+CategoryUI.swift in Sources */,
 				276B5D1E2C8A57C600DB82E2 /* GiftOptionsRowItem.swift in Sources */,
 				C2271DB31DAE127A001792B6 /* GeneralRowView.swift in Sources */,
 				C2167E511DC220E900F98E03 /* PeerMediaMusicRowContent.swift in Sources */,

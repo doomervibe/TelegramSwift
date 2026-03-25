@@ -774,8 +774,8 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
             .search:      FocusStrings.search,
             .stories:     FocusStrings.stories,
         ]
-        leftController.chatList.genericView.focusCategoryOverride = titleMap[category]
-
+        leftController.chatList.updateCategoryUI(for: titleMap[category])
+        
         // When leaving archive, pop that controller back to the root chat list.
         if category != .archive, leftController.navigation.stackCount > 1 {
             leftController.navigation.back(animated: false)
@@ -962,6 +962,5 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
     }
     
 }
-
 
 

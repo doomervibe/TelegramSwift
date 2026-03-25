@@ -131,22 +131,22 @@ public final class PeerCallScreen : ViewController {
                     break
                 default:
                     if !redial {
-                        actions.append(makeAction(type: .video, text: L10n.callVideo, resource: .icVideo, active: external.videoState == .active(true) && !external.isScreenCapture, enabled: videoEnabled, action: { [weak self] in
+                        actions.append(makeAction(type: .video, text: L10n.callVideo, imageName: "ic_video", active: external.videoState == .active(true) && !external.isScreenCapture, enabled: videoEnabled, action: { [weak self] in
                             self?.external.toggleCamera(external)
                         }))
-                        actions.append(makeAction(type: .video, text: L10n.callScreen, resource: .icScreen, active: external.videoState == .active(true) && external.isScreenCapture, enabled: videoEnabled, action: {
+                        actions.append(makeAction(type: .video, text: L10n.callScreen, imageName: "ic_screen", active: external.videoState == .active(true) && external.isScreenCapture, enabled: videoEnabled, action: {
                             self?.external.toggleScreencast(external)
                         }))
                     }
                 }
             }
   
-            actions.append(makeAction(type: .mute, text: L10n.callMute, resource: .icMute, active: external.isMuted && isActive, enabled: muteEnabled, action: {
+            actions.append(makeAction(type: .mute, text: L10n.callMute, imageName: "ic_mute", active: external.isMuted && isActive, enabled: muteEnabled, action: {
                 self?.external.toggleMute()
             }))
             switch external.state {
             case .ringing:
-                actions.append(makeAction(type: .accept, text: L10n.callAccept, resource: .icAccept, interactive: true, attract: true, action: {
+                actions.append(makeAction(type: .accept, text: L10n.callAccept, imageName: "ic_accept", interactive: true, attract: true, action: {
                     self?.external.acceptcall()
                 }))
             default:
@@ -154,12 +154,12 @@ public final class PeerCallScreen : ViewController {
             }
             
             if redial {
-                actions.append(makeAction(type: .redial, text: L10n.callRecall, resource: .icRedial, interactive: true, attract: false, action: {
+                actions.append(makeAction(type: .redial, text: L10n.callRecall, imageName: "ic_redial", interactive: true, attract: false, action: {
                     self?.external.recall()
                 }))
             }
             
-            actions.append(makeAction(type: .mute, text: L10n.callEnd, resource: .icDecline, enabled: endEnabled, interactive: true, action: {
+            actions.append(makeAction(type: .mute, text: L10n.callEnd, imageName: "ic_decline", enabled: endEnabled, interactive: true, action: {
                 self?.external.endcall(external)
             }))
             
