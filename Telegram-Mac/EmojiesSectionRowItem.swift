@@ -374,13 +374,13 @@ final class EmojiesSectionRowItem : GeneralRowItem {
                         if #available(macOS 13, *) {
                             items.append(ContextSeparatorItem())
                             //TODO LANG
-                            items.append(ContextMenuItem("Apply for Focus Filter", handler: {
+                            items.append(ContextMenuItem(FocusStrings.applyForFocusFilter, handler: {
                                 _ = updateSomeSettingsInteractively(postbox: context.account.postbox, { current in
                                     var current = current
                                     current.focusIntentStatusActive = sticker.file.fileId.id
                                     return current
                                 }).startStandalone()
-                                showModalText(for: context.window, text: "This emoji will be used for system Focus Mode")
+                                showModalText(for: context.window, text: FocusStrings.focusFilterEmojiInfo)
                             }))
                         }
                         #endif

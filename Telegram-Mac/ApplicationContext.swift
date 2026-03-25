@@ -765,14 +765,14 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
         rightController.close(animated: true)
 
         let titleMap: [FocusCategory: String] = [
-            .inbox:       "Inbox",
-            .digest:      "Channels",
-            .channels:    "Channels",
-            .archive:     "Archive",
-            .saved:       "Saved Messages",
-            .contacts:    "Contacts",
-            .search:      "Search",
-            .stories:     "Stories",
+            .inbox:       FocusStrings.inbox,
+            .digest:      FocusStrings.channels,
+            .channels:    FocusStrings.channels,
+            .archive:     FocusStrings.archive,
+            .saved:       FocusStrings.savedMessages,
+            .contacts:    FocusStrings.contacts,
+            .search:      FocusStrings.search,
+            .stories:     FocusStrings.stories,
         ]
         leftController.chatList.genericView.focusCategoryOverride = titleMap[category]
 

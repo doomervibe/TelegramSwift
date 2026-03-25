@@ -233,11 +233,11 @@ fileprivate final class TitleView : Control {
             case .contacts:
                 return strings().peerListTitleContacts
             case .chats:
-                return FocusProduct.isEnabled ? "Inbox" : strings().peerListTitleChats
+                return FocusProduct.isEnabled ? FocusStrings.inbox : strings().peerListTitleChats
             case .settings:
-                return "Settings"
+                return FocusStrings.settings
             case .archivedChats:
-                return FocusProduct.isEnabled ? "Archive" : strings().peerListTitleArchive
+                return FocusProduct.isEnabled ? FocusStrings.archive : strings().peerListTitleArchive
             case .forum:
                 return strings().peerListTitleForum
             }

@@ -333,6 +333,9 @@ private func profileSearchableItems(context: AccountContext, canAddAccount: Bool
 
 
 private func stickerSearchableItems(context: AccountContext, archivedStickerPacks: [ArchivedStickerPackItem]?) -> [SettingsSearchableItem] {
+    if FocusProduct.isEnabled {
+        return []
+    }
     let icon: SettingsSearchableItemIcon = .stickers
     
     let presentStickerSettings: (AccountContext, (SettingsSearchableItemPresentation, ViewController?) -> Void, InstalledStickerPacksEntryTag?) -> Void = { context, present, itemTag in
@@ -363,7 +366,7 @@ private func notificationSearchableItems(context: AccountContext, settings: Glob
         present(.push, NotificationPreferencesController(context, focusOnItemTag: itemTag))
     }
     
-    return [
+    var items: [SettingsSearchableItem] = [
         SettingsSearchableItem(id: .notifications(0), title: strings().accountSettingsNotifications, alternate: synonyms(strings().settingsSearchSynonymsNotificationsTitle), icon: icon, breadcrumbs: [], present: { context, _, present in
             presentNotificationSettings(context, present, nil)
         }),
@@ -373,19 +376,26 @@ private func notificationSearchableItems(context: AccountContext, settings: Glob
 //        SettingsSearchableItem(id: .notifications(18), title: strings().notificationSettingsIncludeGroups, alternate: synonyms(strings().settingsSearchSynonymsNotificationsBadgeIncludeMutedPublicGroups), icon: icon, breadcrumbs: [strings().accountSettingsNotifications, strings().notificationSettingsBadgeHeader], present: { context, _, present in
 //            presentNotificationSettings(context, present, .includePublicGroups)
 //        }),
-        SettingsSearchableItem(id: .notifications(19), title: strings().notificationSettingsIncludeChannels, alternate: synonyms(strings().settingsSearchSynonymsNotificationsBadgeIncludeMutedChannels), icon: icon, breadcrumbs: [strings().accountSettingsNotifications, strings().notificationSettingsBadgeHeader], present: { context, _, present in
+    ]
+    if !FocusProduct.isEnabled {
+        items.append(SettingsSearchableItem(id: .notifications(19), title: strings().notificationSettingsIncludeChannels, alternate: synonyms(strings().settingsSearchSynonymsNotificationsBadgeIncludeMutedChannels), icon: icon, breadcrumbs: [strings().accountSettingsNotifications, strings().notificationSettingsBadgeHeader], present: { context, _, present in
             presentNotificationSettings(context, present, .includeChannels)
-        }),
+        }))
+    }
+    items.append(contentsOf: [
         SettingsSearchableItem(id: .notifications(20), title: strings().notificationSettingsCountUnreadMessages, alternate: synonyms(strings().settingsSearchSynonymsNotificationsBadgeCountUnreadMessages), icon: icon, breadcrumbs: [strings().accountSettingsNotifications, strings().notificationSettingsBadgeHeader], present: { context, _, present in
             presentNotificationSettings(context, present, .unreadCountCategory)
         }),
-        SettingsSearchableItem(id: .notifications(21), title: strings().notificationSettingsContactJoined, alternate: synonyms(strings().settingsSearchSynonymsNotificationsContactJoined), icon: icon, breadcrumbs: [strings().accountSettingsNotifications], present: { context, _, present in
+    ])
+    if !FocusProduct.isEnabled {
+        items.append(SettingsSearchableItem(id: .notifications(21), title: strings().notificationSettingsContactJoined, alternate: synonyms(strings().settingsSearchSynonymsNotificationsContactJoined), icon: icon, breadcrumbs: [strings().accountSettingsNotifications], present: { context, _, present in
             presentNotificationSettings(context, present, .joinedNotifications)
-        }),
-        SettingsSearchableItem(id: .notifications(22), title: strings().notificationSettingsResetNotifications, alternate: synonyms(strings().settingsSearchSynonymsNotificationsResetAllNotifications), icon: icon, breadcrumbs: [strings().accountSettingsNotifications], present: { context, _, present in
-            presentNotificationSettings(context, present, .reset)
-        })
-    ]
+        }))
+    }
+    items.append(SettingsSearchableItem(id: .notifications(22), title: strings().notificationSettingsResetNotifications, alternate: synonyms(strings().settingsSearchSynonymsNotificationsResetAllNotifications), icon: icon, breadcrumbs: [strings().accountSettingsNotifications], present: { context, _, present in
+        presentNotificationSettings(context, present, .reset)
+    }))
+    return items
 }
 
 private func privacySearchableItems(context: AccountContext, privacySettings: AccountPrivacySettings?) -> [SettingsSearchableItem] {
@@ -450,7 +460,7 @@ private func privacySearchableItems(context: AccountContext, privacySettings: Ac
     let passcodeTitle: String = strings().privacySettingsPasscode
 
     
-    return [
+    var privacyItems: [SettingsSearchableItem] = [
         SettingsSearchableItem(id: .privacy(0), title: strings().accountSettingsPrivacyAndSecurity, alternate: synonyms(strings().settingsSearchSynonymsPrivacyTitle), icon: icon, breadcrumbs: [], present: { context, _, present in
             presentPrivacySettings(context, present, nil)
         }),
@@ -466,9 +476,13 @@ private func privacySearchableItems(context: AccountContext, privacySettings: Ac
         SettingsSearchableItem(id: .privacy(4), title: strings().privacySettingsForwards, alternate: synonyms(strings().settingsSearchSynonymsPrivacyForwards), icon: icon, breadcrumbs: [strings().accountSettingsPrivacyAndSecurity], present: { context, _, present in
             presentSelectivePrivacySettings(context, .forwards, present)
         }),
-        SettingsSearchableItem(id: .privacy(5), title: strings().privacySettingsVoiceCalls, alternate: synonyms(strings().settingsSearchSynonymsPrivacyCalls), icon: icon, breadcrumbs: [strings().accountSettingsPrivacyAndSecurity], present: { context, _, present in
+    ]
+    if !FocusProduct.isEnabled {
+        privacyItems.append(SettingsSearchableItem(id: .privacy(5), title: strings().privacySettingsVoiceCalls, alternate: synonyms(strings().settingsSearchSynonymsPrivacyCalls), icon: icon, breadcrumbs: [strings().accountSettingsPrivacyAndSecurity], present: { context, _, present in
             presentSelectivePrivacySettings(context, .voiceCalls, present)
-        }),
+        }))
+    }
+    privacyItems.append(contentsOf: [
         SettingsSearchableItem(id: .privacy(6), title: strings().privacySettingsGroups, alternate: synonyms(strings().settingsSearchSynonymsPrivacyGroupsAndChannels), icon: icon, breadcrumbs: [strings().accountSettingsPrivacyAndSecurity], present: { context, _, present in
             presentSelectivePrivacySettings(context, .groupInvitations, present)
         }),
@@ -500,7 +514,8 @@ private func privacySearchableItems(context: AccountContext, privacySettings: Ac
         SettingsSearchableItem(id: .privacy(15), title: strings().privacyAndSecurityClearCloudDrafts, alternate: synonyms(strings().settingsSearchSynonymsPrivacyDataDeleteDrafts), icon: icon, breadcrumbs: [strings().accountSettingsPrivacyAndSecurity], present: { context, _, present in
             presentPrivacySettings(context, present, .cloudDraft)
         })
-    ]
+    ])
+    return privacyItems
 }
 
 private func dataSearchableItems(context: AccountContext) -> [SettingsSearchableItem] {
@@ -580,6 +595,9 @@ private func proxySearchableItems(context: AccountContext, servers: [ProxyServer
 }
 
 private func appearanceSearchableItems(context: AccountContext) -> [SettingsSearchableItem] {
+    if FocusProduct.isEnabled {
+        return []
+    }
     let icon: SettingsSearchableItemIcon = .appearance
     
     let presentAppearanceSettings: (AccountContext, (SettingsSearchableItemPresentation, ViewController?) -> Void, ThemeSettingsEntryTag?) -> Void = { context, present, itemTag in

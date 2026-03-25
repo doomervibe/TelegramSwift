@@ -60,7 +60,7 @@ final class FocusMediaSearchRowItem: GeneralRowItem {
             if isVoiceOrVideo {
                 let duration = Int(file.duration ?? 0)
                 let durStr = durationString(duration)
-                titleLayout = TextViewLayout(.initialize(string: "Voice message · \(durStr)", color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
+                titleLayout = TextViewLayout(.initialize(string: "\(FocusStrings.voiceMessage) · \(durStr)", color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
                 let sender = message.author?.displayTitle ?? ""
                 let dateStr = DateUtils.string(forMessageListDate: message.timestamp) ?? ""
                 subtitleLayout = TextViewLayout(.initialize(string: "\(sender) · \(dateStr)", color: theme.colors.grayText, font: .normal(.small)), maximumNumberOfLines: 1)
@@ -69,11 +69,11 @@ final class FocusMediaSearchRowItem: GeneralRowItem {
                 let (songTitle, artist) = file.musicText
                 let duration = Int(file.duration ?? 0)
                 let durStr = durationString(duration)
-                titleLayout = TextViewLayout(.initialize(string: songTitle.isEmpty ? (file.fileName ?? "Unknown") : songTitle, color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
+                titleLayout = TextViewLayout(.initialize(string: songTitle.isEmpty ? (file.fileName ?? FocusStrings.unknown) : songTitle, color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
                 subtitleLayout = TextViewLayout(.initialize(string: artist.isEmpty ? durStr : "\(artist) · \(durStr)", color: theme.colors.grayText, font: .normal(.small)), maximumNumberOfLines: 1)
                 kind = .music(file)
             } else {
-                let fileName = file.fileName ?? "Unknown"
+                let fileName = file.fileName ?? FocusStrings.unknown
                 titleLayout = TextViewLayout(.initialize(string: fileName, color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
                 let sizeStr = file.size.map { dataSizeString(Int($0), formatting: DataSizeStringFormatting.current) } ?? ""
                 let dateStr = DateUtils.string(forMessageListDate: message.timestamp) ?? ""
@@ -86,7 +86,7 @@ final class FocusMediaSearchRowItem: GeneralRowItem {
                 titleLayout = TextViewLayout(.initialize(string: title, color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
                 subtitleLayout = TextViewLayout(.initialize(string: content.displayUrl ?? content.url, color: theme.colors.accent, font: .normal(.small)), maximumNumberOfLines: 1)
             } else {
-                titleLayout = TextViewLayout(.initialize(string: "Link", color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
+                titleLayout = TextViewLayout(.initialize(string: FocusStrings.link, color: theme.colors.text, font: .medium(.text)), maximumNumberOfLines: 1)
                 subtitleLayout = TextViewLayout(.initialize(string: "", color: theme.colors.grayText, font: .normal(.small)), maximumNumberOfLines: 1)
             }
             kind = .link(webpage)

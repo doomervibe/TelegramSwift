@@ -2147,7 +2147,7 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
              }
              
              
-             if let autoremoveTimeout = item.autoremoveTimeout, activeImage == nil, badgeShortView == nil, groupActivityView == nil {
+             if let autoremoveTimeout = item.autoremoveTimeout, !FocusProduct.isEnabled, activeImage == nil, badgeShortView == nil, groupActivityView == nil {
                  let current: AvatarBadgeView
                  let isNew: Bool
                  if let view = self.avatarTimerBadge {
@@ -2163,7 +2163,8 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
                  
                  let avatarBadgeSize = CGSize(width: avatarTimerBadgeDiameter, height: avatarTimerBadgeDiameter)
                  current.update(size: avatarBadgeSize, text: shortTimeIntervalString(value: autoremoveTimeout))
-                 let avatarBadgeFrame = CGRect(origin: CGPoint(x: avatarFrame.maxX - avatarBadgeSize.width + 3, y: avatarFrame.maxY - avatarBadgeSize.height), size: avatarBadgeSize)
+                 let badgeBottomY = min(avatarFrame.maxY, item.height)
+                 let avatarBadgeFrame = CGRect(origin: CGPoint(x: avatarFrame.maxX - avatarBadgeSize.width + 3, y: badgeBottomY - avatarBadgeSize.height), size: avatarBadgeSize)
                  
                  
                  current.frame = avatarBadgeFrame
@@ -3127,7 +3128,8 @@ class ChatListRowView: TableRowView, ViewDisplayDelegate, RevealTableView {
         if let view = avatarTimerBadge {
             let avatarFrame = self.photoContainer.frame
             let avatarBadgeSize = CGSize(width: avatarTimerBadgeDiameter, height: avatarTimerBadgeDiameter)
-            let avatarBadgeFrame = CGRect(origin: CGPoint(x: avatarFrame.maxX - avatarBadgeSize.width, y: avatarFrame.maxY - avatarBadgeSize.height), size: avatarBadgeSize)
+            let badgeBottomY = min(avatarFrame.maxY, self.containerView.frame.height)
+            let avatarBadgeFrame = CGRect(origin: CGPoint(x: avatarFrame.maxX - avatarBadgeSize.width, y: badgeBottomY - avatarBadgeSize.height), size: avatarBadgeSize)
             view.frame = avatarBadgeFrame
         }
 

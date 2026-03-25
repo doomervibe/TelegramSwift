@@ -202,13 +202,13 @@ final class FocusCategoryStripController: TelegramGenericViewController<FocusCat
         let rowH = FocusCategoryStripView.rowHeight
 
         let defs: [(FocusCategory, String, String)] = [
-            (.inbox,       "Inbox",        "tray"),
-            (.channels,    "Channels",     "antenna.radiowaves.left.and.right"),
-            (.archive,     "Archive",      "archivebox"),
-            (.saved,       "Saved",        "bookmark"),
-            (.contacts,    "Contacts",     "person.2"),
-            (.search,      "Search",       "magnifyingglass"),
-            (.stories,     "Stories",      "sparkles"),
+            (.inbox,       FocusStrings.inbox,      "tray"),
+            (.channels,    FocusStrings.channels,   "antenna.radiowaves.left.and.right"),
+            (.archive,     FocusStrings.archive,    "archivebox"),
+            (.saved,       FocusStrings.saved,      "bookmark"),
+            (.contacts,    FocusStrings.contacts,   "person.2"),
+            (.search,      FocusStrings.search,     "magnifyingglass"),
+            (.stories,     FocusStrings.stories,    "sparkles"),
         ]
 
         // Rebuild category stack
@@ -226,7 +226,7 @@ final class FocusCategoryStripController: TelegramGenericViewController<FocusCat
 
         // Rebuild settings row
         gv.settingsRow.subviews.forEach { $0.removeFromSuperview() }
-        let sr = makeCategoryRow(width: w, height: rowH, category: .settings, label: "Settings", symbolName: "gearshape", badgeCount: 0)
+        let sr = makeCategoryRow(width: w, height: rowH, category: .settings, label: FocusStrings.settings, symbolName: "gearshape", badgeCount: 0)
         sr.frame = NSMakeRect(0, 0, w, rowH)
         gv.settingsRow.addSubview(sr)
 

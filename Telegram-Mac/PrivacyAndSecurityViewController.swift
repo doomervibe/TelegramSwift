@@ -9,6 +9,7 @@
 import Cocoa
 import TGUIKit
 import TelegramCore
+import InAppSettings
 
 import SwiftSignalKit
 import Postbox
@@ -601,13 +602,19 @@ private func privacyAndSecurityControllerEntries(state: PrivacyAndSecurityContro
         entries.append(.phoneNumberPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.phoneNumber), viewType: .firstItem))
         entries.append(.lastSeenPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.presence), viewType: .innerItem))
         entries.append(.groupPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.groupInvitations), viewType: .innerItem))
-        entries.append(.voiceCallPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.voiceCalls), viewType: .innerItem))
+        if !FocusProduct.isEnabled {
+            entries.append(.voiceCallPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.voiceCalls), viewType: .innerItem))
+        }
         entries.append(.profilePhotoPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.profilePhoto), viewType: .innerItem))
         entries.append(.bioPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.bio), viewType: .innerItem))
-        entries.append(.giftsPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.giftsAutoSave), viewType: .innerItem))
-        entries.append(.birthdayPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.birthday), viewType: .innerItem))
+        if !FocusProduct.isEnabled {
+            entries.append(.giftsPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.giftsAutoSave), viewType: .innerItem))
+            entries.append(.birthdayPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.birthday), viewType: .innerItem))
+        }
         entries.append(.forwardPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.forwards), viewType: .innerItem))
-        entries.append(.voiceMessagesPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.voiceMessages), !context.isPremium, viewType: .innerItem))
+        if !FocusProduct.isEnabled {
+            entries.append(.voiceMessagesPrivacy(sectionId: sectionId, stringForSelectiveSettings(settings: privacySettings.voiceMessages), !context.isPremium, viewType: .innerItem))
+        }
         
         let messagePrivacyText: String
         switch privacySettings.globalSettings.nonContactChatsPrivacy {
@@ -624,13 +631,19 @@ private func privacyAndSecurityControllerEntries(state: PrivacyAndSecurityContro
         entries.append(.phoneNumberPrivacy(sectionId: sectionId, "", viewType: .firstItem))
         entries.append(.lastSeenPrivacy(sectionId: sectionId, "", viewType: .innerItem))
         entries.append(.groupPrivacy(sectionId: sectionId, "", viewType: .innerItem))
-        entries.append(.voiceCallPrivacy(sectionId: sectionId, "", viewType: .innerItem))
+        if !FocusProduct.isEnabled {
+            entries.append(.voiceCallPrivacy(sectionId: sectionId, "", viewType: .innerItem))
+        }
         entries.append(.profilePhotoPrivacy(sectionId: sectionId, "", viewType: .innerItem))
         entries.append(.bioPrivacy(sectionId: sectionId, "", viewType: .innerItem))
-        entries.append(.birthdayPrivacy(sectionId: sectionId, "", viewType: .innerItem))
-        entries.append(.giftsPrivacy(sectionId: sectionId, "", viewType: .innerItem))
-        entries.append(.forwardPrivacy(sectionId: sectionId, "", viewType: .innerItem))
-        entries.append(.voiceMessagesPrivacy(sectionId: sectionId, "", !context.isPremium, viewType: .lastItem))
+        if !FocusProduct.isEnabled {
+            entries.append(.birthdayPrivacy(sectionId: sectionId, "", viewType: .innerItem))
+            entries.append(.giftsPrivacy(sectionId: sectionId, "", viewType: .innerItem))
+        }
+        entries.append(.forwardPrivacy(sectionId: sectionId, "", viewType: FocusProduct.isEnabled ? .lastItem : .innerItem))
+        if !FocusProduct.isEnabled {
+            entries.append(.voiceMessagesPrivacy(sectionId: sectionId, "", !context.isPremium, viewType: .lastItem))
+        }
     }
 
 
@@ -710,13 +723,13 @@ private func privacyAndSecurityControllerEntries(state: PrivacyAndSecurityContro
         entries.append(.webAuthorizationsHeader(sectionId: sectionId))
         entries.append(.webAuthorizations(sectionId: sectionId, viewType: .singleItem))
         
-        if FastSettings.isSecretChatWebPreviewAvailable(for: context.account.id.int64) != nil {
+        if !FocusProduct.isEnabled, FastSettings.isSecretChatWebPreviewAvailable(for: context.account.id.int64) != nil {
             entries.append(.section(sectionId: sectionId))
             sectionId += 1
         }
     }
     
-    if let value = FastSettings.isSecretChatWebPreviewAvailable(for: context.account.id.int64) {
+    if !FocusProduct.isEnabled, let value = FastSettings.isSecretChatWebPreviewAvailable(for: context.account.id.int64) {
         entries.append(.secretChatWebPreviewHeader(sectionId: sectionId))
         entries.append(.secretChatWebPreviewToggle(sectionId: sectionId, value: value, viewType: .singleItem))
         entries.append(.secretChatWebPreviewDesc(sectionId: sectionId))

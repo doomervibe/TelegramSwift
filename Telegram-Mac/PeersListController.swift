@@ -146,7 +146,7 @@ struct PeerListState : Equatable {
         var title: String {
             switch self {
             case .chats:
-                return FocusProduct.isEnabled ? "Conversations" : strings().chatListChatsTag
+                return FocusProduct.isEnabled ? FocusStrings.conversations : strings().chatListChatsTag
             case .downloads:
                 return strings().chatListDownloadsTag
             case .channels:
@@ -844,13 +844,13 @@ fileprivate final class TitleView : Control {
             case .contacts:
                 return strings().peerListTitleContacts
             case .chats:
-                return FocusProduct.isEnabled ? "Inbox" : strings().peerListTitleChats
+                return FocusProduct.isEnabled ? FocusStrings.inbox : strings().peerListTitleChats
             case .archivedChats:
-                return FocusProduct.isEnabled ? "Archive" : strings().peerListTitleArchive
+                return FocusProduct.isEnabled ? FocusStrings.archive : strings().peerListTitleArchive
             case .forum:
                 return strings().peerListTitleForum
             case .savedMessages:
-                return FocusProduct.isEnabled ? "Notes" : strings().peerListTitleSavedMessages
+                return FocusProduct.isEnabled ? FocusStrings.notes : strings().peerListTitleSavedMessages
             }
         }
     }
@@ -1703,7 +1703,7 @@ class PeerListContainerView : Control {
         let containerSize = NSMakeSize(state.splitState == .minimisize ? 70 : size.width, offset)
                 
         transition.updateFrame(view: self.containerView, frame: NSMakeRect(0, inset, containerSize.width, offset))
-        
+        self.containerView.isHidden = offset <= 0
         
         transition.updateFrame(view: self.statusContainer, frame: NSMakeRect(0, 0, containerSize.width, statusHeight))
         
@@ -1712,8 +1712,8 @@ class PeerListContainerView : Control {
 
         transition.updateFrame(view: self.backgroundView, frame: size.bounds)
         
-        transition.updateFrame(view: self.borderView, frame: CGRect(origin: CGPoint.init(x: 0, y: navigationHeight - .borderSize), size: CGSize(width: size.width, height: .borderSize)))
-        transition.updateAlpha(view: borderView, alpha: state.searchState == .Focus ? 0 : 1)
+        transition.updateFrame(view: self.borderView, frame: CGRect(origin: CGPoint.init(x: 0, y: max(0, navigationHeight - .borderSize)), size: CGSize(width: size.width, height: .borderSize)))
+        transition.updateAlpha(view: borderView, alpha: (state.searchState == .Focus || navigationHeight <= 0) ? 0 : 1)
 
 
         
@@ -1730,7 +1730,16 @@ class PeerListContainerView : Control {
         }
 
 
-        let searchRect = NSMakeRect(10, searchY, (size.width - 10 * 2), componentSize.height)
+        var searchX: CGFloat = 10
+        var searchWidth: CGFloat = size.width - 10 * 2
+        if state.isContacts, let contactsSort = self.contactsSort {
+            let sortY = searchY + floorToScreenPixels(backingScaleFactor, (componentSize.height - contactsSort.frame.height) / 2)
+            transition.updateFrame(view: contactsSort, frame: NSMakeRect(10, sortY, contactsSort.frame.width, contactsSort.frame.height))
+            searchX = contactsSort.frame.maxX + 10
+            searchWidth = max(120, size.width - searchX - 10)
+        }
+        
+        let searchRect = NSMakeRect(searchX, searchY, searchWidth, componentSize.height)
         
         
         var bottomInset: CGFloat = 0
@@ -1873,17 +1882,21 @@ class PeerListContainerView : Control {
     
     var navigationHeight: CGFloat {
         guard let state = self.state else {
-            return 50
+            return FocusProduct.isEnabled ? 0 : 50
         }
         
         if case .forum = state.mode, state.splitState != .minimisize {
             return 0
         }
-        var offset: CGFloat = 50
+        var offset: CGFloat = FocusProduct.isEnabled ? 0 : 50
         
         if state.splitState != .minimisize, state.mode.isPlain {
             if !FocusProduct.isEnabled || state.searchState == .Focus || state.isContacts {
-                offset += 40
+                if FocusProduct.isEnabled && state.isContacts {
+                    offset += 30
+                } else {
+                    offset += 40
+                }
             }
             if let storiesItem = self.storiesItem {
                 offset += storiesItem.navigationHeight
@@ -1897,6 +1910,9 @@ class PeerListContainerView : Control {
     }
     var statusHeight: CGFloat {
         guard let state = self.state else {
+            return 0
+        }
+        if FocusProduct.isEnabled && state.mode.isPlain {
             return 0
         }
         if !state.mode.isPlain {
@@ -2038,6 +2054,7 @@ enum PeerListMode : Equatable {
 private class SearchContainer : Control {
     let tagsView: ScrollableSegmentView
     let searchView: NSView
+    private var visibleTagsHeight: CGFloat = 30
     
     init(frame frameRect: NSRect, searchView: NSView) {
         self.searchView = searchView
@@ -2092,7 +2109,7 @@ private class SearchContainer : Control {
                 
                 let isForum = state.forumPeer != nil
                 
-                let chatsLabel = FocusProduct.isEnabled ? "Conversations" : strings().chatListChatsTag
+                let chatsLabel = FocusProduct.isEnabled ? FocusStrings.conversations : strings().chatListChatsTag
                 items.append(.init(title: isForum ? strings().chatListTopicsTag : state.peerTag == nil ? chatsLabel : strings().chatListMessagesTag, index: index, uniqueId: -4, selected: state.selectedTag == .chats, insets: insets, icon: nil, theme: presentation, equatable: UIEquatable(state)))
                 index += 1
                 
@@ -2131,6 +2148,8 @@ private class SearchContainer : Control {
                         
             current.updateItems(items, animated: animated, autoscroll: previous?.selectedTag != state.selectedTag)
             current.theme = presentation
+            self.visibleTagsHeight = state.isContacts ? 0 : 30
+            current.isHidden = self.visibleTagsHeight == 0
             
             current.didChangeSelectedItem = { [weak arguments] item in
                 if let tag = PeerListState.SelectedSearchTag(rawValue: Int32(item.uniqueId)) {
@@ -2145,8 +2164,8 @@ private class SearchContainer : Control {
     
     override func layout() {
         super.layout()
-        tagsView.frame = NSMakeRect(0, -10, frame.width, 40)
-        self.searchView.frame = NSMakeRect(0, tagsView.frame.maxY, frame.width, frame.height - tagsView.frame.maxY)
+        tagsView.frame = NSMakeRect(0, visibleTagsHeight == 0 ? 0 : -10, frame.width, visibleTagsHeight == 0 ? 0 : 40)
+        self.searchView.frame = NSMakeRect(0, visibleTagsHeight, frame.width, frame.height - visibleTagsHeight)
     }
 }
 

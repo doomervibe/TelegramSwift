@@ -334,16 +334,21 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     
     var headerUnique:Int = -1
     
-    entries.append(.section(sectionId: sectionId))
-    sectionId += 1
-    
-    entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsEnergySaving))
-    headerUnique -= 1
-    
-    entries.append(.liteMode(sectionId: sectionId, enabled: baseSettings.liteMode.enabled, viewType: .singleItem))
-    
-    entries.append(.section(sectionId: sectionId))
-    sectionId += 1
+    if !FocusProduct.isEnabled {
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+        
+        entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsEnergySaving))
+        headerUnique -= 1
+        
+        entries.append(.liteMode(sectionId: sectionId, enabled: baseSettings.liteMode.enabled, viewType: .singleItem))
+        
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+    } else {
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+    }
     
     
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsSpellingTitle))
@@ -363,12 +368,16 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
 
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsEmoji))
     headerUnique -= 1
-    entries.append(.sidebar(sectionId: sectionId, enabled: FastSettings.sidebarEnabled, viewType: .firstItem))
-    entries.append(.emojiReplacements(sectionId: sectionId, enabled: FastSettings.isPossibleReplaceEmojies, viewType: .innerItem))
-    if !baseSettings.predictEmoji {
-        entries.append(.predictEmoji(sectionId: sectionId, enabled: baseSettings.predictEmoji, viewType: .innerItem))
+    if !FocusProduct.isEnabled {
+        entries.append(.sidebar(sectionId: sectionId, enabled: FastSettings.sidebarEnabled, viewType: .firstItem))
+        entries.append(.emojiReplacements(sectionId: sectionId, enabled: FastSettings.isPossibleReplaceEmojies, viewType: .innerItem))
+        if !baseSettings.predictEmoji {
+            entries.append(.predictEmoji(sectionId: sectionId, enabled: baseSettings.predictEmoji, viewType: .innerItem))
+        }
+        entries.append(.bigEmoji(sectionId: sectionId, enabled: baseSettings.bigEmoji, viewType: .lastItem))
+    } else {
+        entries.append(.sidebar(sectionId: sectionId, enabled: FastSettings.sidebarEnabled, viewType: .singleItem))
     }
-    entries.append(.bigEmoji(sectionId: sectionId, enabled: baseSettings.bigEmoji, viewType: .lastItem))
 
     
 
@@ -378,9 +387,14 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsInterfaceHeader))
     headerUnique -= 1
-    entries.append(.showCallsTab(sectionId: sectionId, enabled: baseSettings.showCallsTab, viewType: .firstItem))
-    entries.append(.statusBar(sectionId: sectionId, enabled: baseSettings.statusBar, viewType: .innerItem))
-    entries.append(.previewChats(sectionId: sectionId, enabled: additionalSettings.previewChats, viewType: .lastItem))
+    if !FocusProduct.isEnabled {
+        entries.append(.showCallsTab(sectionId: sectionId, enabled: baseSettings.showCallsTab, viewType: .firstItem))
+        entries.append(.statusBar(sectionId: sectionId, enabled: baseSettings.statusBar, viewType: .innerItem))
+        entries.append(.previewChats(sectionId: sectionId, enabled: additionalSettings.previewChats, viewType: .lastItem))
+    } else {
+        entries.append(.statusBar(sectionId: sectionId, enabled: baseSettings.statusBar, viewType: .firstItem))
+        entries.append(.previewChats(sectionId: sectionId, enabled: additionalSettings.previewChats, viewType: .lastItem))
+    }
     entries.append(.previewChatsInfo(sectionId: sectionId))
 
     
@@ -402,19 +416,24 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     entries.append(.sendLargePhotos(sectionId: sectionId, enabled: FastSettings.sendLargePhotos, viewType: .lastItem))
 //    entries.append(.acceptSecretChats(sectionId: sectionId, enabled: secretChatSettings.acceptOnThisDevice, viewType: .lastItem))
     
-    entries.append(.section(sectionId: sectionId))
-    sectionId += 1
-    
-    entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsForceTouchHeader))
-    headerUnique -= 1
-    
-    entries.append(.forceTouchReply(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .reply, viewType: .firstItem))
-    entries.append(.forceTouchEdit(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .edit, viewType: .innerItem))
-    entries.append(.forceTouchForward(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .forward, viewType: .innerItem))
-    entries.append(.forceTouchReact(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .react, viewType: .lastItem))
+    if !FocusProduct.isEnabled {
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+        
+        entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsForceTouchHeader))
+        headerUnique -= 1
+        
+        entries.append(.forceTouchReply(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .reply, viewType: .firstItem))
+        entries.append(.forceTouchEdit(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .edit, viewType: .innerItem))
+        entries.append(.forceTouchForward(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .forward, viewType: .innerItem))
+        entries.append(.forceTouchReact(sectionId: sectionId, enabled: FastSettings.forceTouchAction == .react, viewType: .lastItem))
 
-    entries.append(.section(sectionId: sectionId))
-    sectionId += 1
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+    } else {
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+    }
     
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsInputSettings))
     headerUnique -= 1
@@ -424,14 +443,15 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     entries.append(.section(sectionId: sectionId))
     sectionId += 1
 
-    
-    entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsCallSettingsHeader))
-    headerUnique -= 1
-    
-    entries.append(.callSettings(sectionId: sectionId, enabled: true, viewType: .singleItem))
+    if !FocusProduct.isEnabled {
+        entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsCallSettingsHeader))
+        headerUnique -= 1
+        
+        entries.append(.callSettings(sectionId: sectionId, enabled: true, viewType: .singleItem))
 
-    entries.append(.section(sectionId: sectionId))
-    sectionId += 1
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+    }
     
     entries.append(.showProfileId(sectionId: sectionId, enabled: FastSettings.canViewPeerId, viewType: .singleItem))
 

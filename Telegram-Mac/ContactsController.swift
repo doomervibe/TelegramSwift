@@ -246,7 +246,8 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<ContactsEntry>]?, t
                     arguments.addContact()
                 })
             case .space:
-                item = GeneralRowItem(initialSize, height: 90, stableId: entry.stableId)
+                let spaceHeight: CGFloat = FocusProduct.isEnabled ? 30 : 90
+                item = GeneralRowItem(initialSize, height: spaceHeight, stableId: entry.stableId)
             case let .story(story, _):
                 let string = "\(story.storyCount) stories"
                 item = ShortPeerRowItem(initialSize, peer: story.peer._asPeer(), account: context.account, context: context, stableId: entry.stableId, statusStyle: ControlStyle(foregroundColor: theme.colors.grayText), status: string, borderType: [.Right], contextMenuItems: {

@@ -301,11 +301,10 @@ private func notificationEntries(state: State, settings:InAppNotificationSetting
     
     
     
-    entries.append(.sectionId(sectionId, type: .normal))
-    sectionId += 1
-    
-    
-    if let _ = state.session {
+    if let _ = state.session, !FocusProduct.isEnabled {
+        entries.append(.sectionId(sectionId, type: .normal))
+        sectionId += 1
+        
         entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().sessionPreviewAcceptHeader), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
         index += 1
 
@@ -351,10 +350,12 @@ private func notificationEntries(state: State, settings:InAppNotificationSetting
     })))
     index += 1
     
-    entries.append(InputDataEntry.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_include_channels, data: InputDataGeneralData(name: strings().notificationSettingsIncludeChannels, color: theme.colors.text, type: .switchable(settings.totalUnreadCountIncludeTags.contains(.channel)), viewType: .innerItem, enabled: settings.badgeEnabled, action: {
-        arguments.toggleIncludeChannels(!settings.totalUnreadCountIncludeTags.contains(.channel))
-    })))
-    index += 1
+    if !FocusProduct.isEnabled {
+        entries.append(InputDataEntry.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_include_channels, data: InputDataGeneralData(name: strings().notificationSettingsIncludeChannels, color: theme.colors.text, type: .switchable(settings.totalUnreadCountIncludeTags.contains(.channel)), viewType: .innerItem, enabled: settings.badgeEnabled, action: {
+            arguments.toggleIncludeChannels(!settings.totalUnreadCountIncludeTags.contains(.channel))
+        })))
+        index += 1
+    }
     
     entries.append(InputDataEntry.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_count_unred_messages, data: InputDataGeneralData(name: strings().notificationSettingsCountUnreadMessages, color: theme.colors.text, type: .switchable(settings.totalUnreadCountDisplayCategory == .messages), viewType: .lastItem, enabled: settings.badgeEnabled, action: {
         arguments.toggleCountUnreadMessages(settings.totalUnreadCountDisplayCategory != .messages)
@@ -368,16 +369,18 @@ private func notificationEntries(state: State, settings:InAppNotificationSetting
     entries.append(.sectionId(sectionId, type: .normal))
     sectionId += 1
     
-    entries.append(InputDataEntry.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_new_contacts, data: InputDataGeneralData(name: strings().notificationSettingsContactJoined, color: theme.colors.text, type: .switchable(globalSettings.contactsJoined), viewType: .singleItem, action: {
-        arguments.updateJoinedNotifications(!globalSettings.contactsJoined)
-    })))
-    index += 1
-    
-    entries.append(InputDataEntry.desc(sectionId: sectionId, index: index, text: .plain(strings().notificationSettingsContactJoinedInfo), data: InputDataGeneralTextData(viewType: .textBottomItem)))
-    index += 1
-    
-    entries.append(.sectionId(sectionId, type: .normal))
-    sectionId += 1
+    if !FocusProduct.isEnabled {
+        entries.append(InputDataEntry.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_new_contacts, data: InputDataGeneralData(name: strings().notificationSettingsContactJoined, color: theme.colors.text, type: .switchable(globalSettings.contactsJoined), viewType: .singleItem, action: {
+            arguments.updateJoinedNotifications(!globalSettings.contactsJoined)
+        })))
+        index += 1
+        
+        entries.append(InputDataEntry.desc(sectionId: sectionId, index: index, text: .plain(strings().notificationSettingsContactJoinedInfo), data: InputDataGeneralTextData(viewType: .textBottomItem)))
+        index += 1
+        
+        entries.append(.sectionId(sectionId, type: .normal))
+        sectionId += 1
+    }
 
     
     entries.append(InputDataEntry.desc(sectionId: sectionId, index: index, text: .plain(strings().notificationSettingsSnoofHeader), data: InputDataGeneralTextData(viewType: .textTopItem)))

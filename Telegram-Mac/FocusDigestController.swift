@@ -25,12 +25,12 @@ struct UIDigestBannerAction: UIChatListTextAction {
         self.channels = sortedChannels
         
         let title = NSMutableAttributedString()
-        _ = title.append(string: "Digest  ", color: theme.colors.text, font: .medium(.text))
-        _ = title.append(string: "\(channelCount) channels", color: theme.colors.accent, font: .medium(.text))
+        _ = title.append(string: "\(FocusStrings.digest)  ", color: theme.colors.text, font: .medium(.text))
+        _ = title.append(string: FocusStrings.digestChannelCount(channelCount), color: theme.colors.accent, font: .medium(.text))
         self.text = title
         
         let previewNames = sortedChannels.prefix(3).map { "\($0.1) (\($0.2))" }.joined(separator: "  ·  ")
-        let infoText = previewNames.isEmpty ? "Tap to open" : previewNames
+        let infoText = previewNames.isEmpty ? FocusStrings.tapToOpen : previewNames
         self.info = .initialize(string: infoText, color: theme.colors.grayText, font: .normal(.small))
     }
     
@@ -66,7 +66,7 @@ final class FocusDigestController: ModalViewController {
             left: ModalHeaderData(image: theme.icons.modalClose, handler: { [weak self] in
                 self?.close()
             }),
-            center: ModalHeaderData(title: "Channels with new posts"),
+            center: ModalHeaderData(title: FocusStrings.channelsWithNewPosts),
             right: nil
         )
     }

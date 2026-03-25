@@ -565,12 +565,13 @@ private func accountInfoEntries(peerView:PeerView, context: AccountContext, acco
     entries.append(.whiteSpace(index: index, height: 10))
     index += 1
     
-    
-    entries.append(.stories(index: index, viewType: .singleItem))
-    index += 1
+    if !FocusProduct.isEnabled {
+        entries.append(.stories(index: index, viewType: .singleItem))
+        index += 1
 
-    entries.append(.whiteSpace(index: index, height: 10))
-    index += 1
+        entries.append(.whiteSpace(index: index, height: 10))
+        index += 1
+    }
     
     for bot in attachMenuBots {
         if bot.flags.contains(.showInSettings) {
@@ -609,14 +610,18 @@ private func accountInfoEntries(peerView:PeerView, context: AccountContext, acco
     index += 1
     entries.append(.activeSessions(index: index, viewType: .singleItem, activeSessions: sessionsCount))
     index += 1
-    entries.append(.appearance(index: index, viewType: .singleItem))
-    index += 1
+    if !FocusProduct.isEnabled {
+        entries.append(.appearance(index: index, viewType: .singleItem))
+        index += 1
+    }
     entries.append(.language(index: index, viewType: .singleItem, current: language.localizedName))
     index += 1
-    entries.append(.stickers(index: index, viewType: .singleItem))
-    index += 1
+    if !FocusProduct.isEnabled {
+        entries.append(.stickers(index: index, viewType: .singleItem))
+        index += 1
+    }
     
-    if hasFilters {
+    if !FocusProduct.isEnabled, hasFilters {
         entries.append(.filters(index: index, viewType: .singleItem))
         index += 1
     }
@@ -630,7 +635,7 @@ private func accountInfoEntries(peerView:PeerView, context: AccountContext, acco
     entries.append(.whiteSpace(index: index, height: 20))
     index += 1
     
-    if let peer = peerViewMainPeer(peerView) as? TelegramUser, passportVisible {
+    if !FocusProduct.isEnabled, let peer = peerViewMainPeer(peerView) as? TelegramUser, passportVisible {
         entries.append(.passport(index: index, viewType: .singleItem, peer: PeerEquatable(peer)))
         index += 1
         
@@ -638,7 +643,7 @@ private func accountInfoEntries(peerView:PeerView, context: AccountContext, acco
         index += 1
     }
     
-    if !context.premiumIsBlocked {
+    if !FocusProduct.isEnabled && !context.premiumIsBlocked {
         entries.append(.premium(index: index, viewType: .singleItem))
         index += 1
         

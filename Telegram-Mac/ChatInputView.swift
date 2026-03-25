@@ -357,7 +357,7 @@ class ChatInputView: View, Notifable {
             return strings().messagesPlaceholderAnonymous
         }
         if FocusProduct.isEnabled {
-            return "Write a reply…"
+            return FocusStrings.writeAReply
         }
         return strings().messagesPlaceholderSentMessage
     }
