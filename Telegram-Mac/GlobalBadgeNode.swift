@@ -197,7 +197,7 @@ class GlobalBadgeNode: Node {
                 strongSelf.layoutChanged?()
                 
                 if dockTile {
-                    NSApplication.shared.dockTile.badgeLabel = result.dockText
+                    NSApplication.shared.dockTile.badgeLabel = FocusProduct.isEnabled ? nil : result.dockText
                     forceUpdateStatusBarIconByDockTile(sharedContext: sharedContext)
                 }
             }
