@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 import WebKit
 import UserNotifications
 import TGUIKit
@@ -139,10 +140,119 @@ enum ApplicationContextLaunchAction {
 
 let leftSidebarWidth: CGFloat = 120
 
+/// Collapsed width of the Focus category strip hit zone (main-thread only).
+private let focusLeftHoverZoneWidth: CGFloat = 12
+
+/// Effective width of the Focus left chrome column — for window min size and hover avatar X (main-thread only).
+enum FocusLeftChromeLayout {
+    static var effectiveWidth: CGFloat = focusLeftHoverZoneWidth
+}
+
+/// Hover-expand container: narrow zone by default; expands to `leftSidebarWidth` while the pointer stays inside.
+private final class FocusLeftChromeHostView: View {
+    weak var container: ApplicationContainerView?
+    private let stripWrapper = View()
+    private(set) var columnWidth: CGFloat
+    private var stripExpanded = false
+    private var collapseTask: DispatchWorkItem?
+    private var hoverTracking: NSTrackingArea?
+
+    required init(frame frameRect: NSRect) {
+        columnWidth = focusLeftHoverZoneWidth
+        super.init(frame: frameRect)
+        stripWrapper.layer?.masksToBounds = true
+        addSubview(stripWrapper)
+        wantsLayer = true
+        FocusLeftChromeLayout.effectiveWidth = columnWidth
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError()
+    }
+
+    func setStrip(_ view: NSView) {
+        stripWrapper.subviews.forEach { $0.removeFromSuperview() }
+        stripWrapper.addSubview(view)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        stripWrapper.frame = bounds
+        if let v = stripWrapper.subviews.first {
+            v.frame = stripWrapper.bounds
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = hoverTracking {
+            removeTrackingArea(t)
+        }
+        let ta = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(ta)
+        hoverTracking = ta
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        collapseTask?.cancel()
+        collapseTask = nil
+        if stripExpanded {
+            return
+        }
+        stripExpanded = true
+        columnWidth = leftSidebarWidth
+        FocusLeftChromeLayout.effectiveWidth = columnWidth
+        relayoutContainer(animated: true)
+        container?.onFocusChromeWidthChanged?()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard stripExpanded else { return }
+        collapseTask?.cancel()
+        let task = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.collapseTask = nil
+            self.stripExpanded = false
+            self.columnWidth = focusLeftHoverZoneWidth
+            FocusLeftChromeLayout.effectiveWidth = self.columnWidth
+            self.relayoutContainer(animated: true)
+            self.container?.onFocusChromeWidthChanged?()
+        }
+        collapseTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: task)
+    }
+
+    private func relayoutContainer(animated: Bool) {
+        guard let c = container else { return }
+        if animated {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.18
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.allowsImplicitAnimation = true
+                c.needsLayout = true
+                c.layoutSubtreeIfNeeded()
+            }, completionHandler: nil)
+        } else {
+            c.needsLayout = true
+            c.layoutSubtreeIfNeeded()
+        }
+    }
+}
+
 private final class ApplicationContainerView: View {
     fileprivate let splitView: SplitView
     
     fileprivate private(set) var leftSideView: NSView?
+    private var focusChromeHost: FocusLeftChromeHostView?
+
+    /// Called when hover-expand width changes (window min size).
+    var onFocusChromeWidthChanged: (() -> Void)?
     
     required init(frame frameRect: NSRect) {
         splitView = SplitView(frame: NSMakeRect(0, 0, frameRect.width, frameRect.height))
@@ -156,13 +266,24 @@ private final class ApplicationContainerView: View {
     }
     
     func updateLeftSideView(_ view: NSView?, animated: Bool) {
+        leftSideView?.removeFromSuperview()
+        focusChromeHost?.removeFromSuperview()
+        focusChromeHost = nil
+        leftSideView = nil
+
         if let view = view {
-            addSubview(view)
-        } else {
-            self.leftSideView?.removeFromSuperview()
+            if FocusProduct.isEnabled {
+                let host = FocusLeftChromeHostView(frame: .zero)
+                host.container = self
+                host.setStrip(view)
+                addSubview(host)
+                focusChromeHost = host
+                leftSideView = view
+            } else {
+                addSubview(view)
+                leftSideView = view
+            }
         }
-        
-        self.leftSideView = view
         needsLayout = true
     }
     
@@ -170,18 +291,31 @@ private final class ApplicationContainerView: View {
         super.updateLocalizationAndTheme(theme: theme)
         let t = theme as! TelegramPresentationTheme
         splitView.backgroundColor = FocusProduct.isEnabled ? t.colors.listBackground : t.colors.background
+        focusChromeHost?.backgroundColor = FocusProduct.isEnabled ? t.colors.listBackground : .clear
     }
     
     override func layout() {
         super.layout()
         
+        if FocusProduct.isEnabled, let host = focusChromeHost {
+            let h = frame.height
+            let w = host.columnWidth
+            host.frame = NSMakeRect(0, 0, w, h)
+            host.backgroundColor = splitView.backgroundColor
+            splitView.frame = NSMakeRect(w, 0, frame.width - w, h)
+            FocusLeftChromeLayout.effectiveWidth = w
+            return
+        }
+
         if let leftSideView = leftSideView {
             leftSideView.frame = NSMakeRect(0, 0, leftSidebarWidth, frame.height)
             splitView.frame = NSMakeRect(leftSideView.frame.maxX, 0, frame.width - leftSideView.frame.maxX, frame.height)
+            if FocusProduct.isEnabled {
+                FocusLeftChromeLayout.effectiveWidth = leftSidebarWidth
+            }
         } else {
             splitView.frame = bounds
         }
-        
     }
 }
 
@@ -253,7 +387,6 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
         context.account.importableContacts.set(.single([:]))
         
         self.view = ApplicationContainerView(frame: window.contentView!.bounds)
-        
       
         self.view.splitView.setProportion(proportion: SplitProportion(min:380, max:300+350), state: .single);
         self.view.splitView.setProportion(proportion: SplitProportion(min:300+350, max:300+350+600), state: .dual)
@@ -297,6 +430,9 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
         
         super.init()
         
+        self.view.onFocusChromeWidthChanged = { [weak self] in
+            self?.updateMinMaxWindowSize(animated: false)
+        }
 
                 
         context.bindings = AccountContextBindings(rootNavigation: { [weak self] () -> MajorNavigationController in
@@ -838,7 +974,12 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
     
     
     private func updateMinMaxWindowSize(animated: Bool) {
-        var width: CGFloat = 380 + leftSidebarWidth
+        var width: CGFloat = 380
+        if FocusProduct.isEnabled {
+            width += FocusLeftChromeLayout.effectiveWidth
+        } else {
+            width += leftSidebarWidth
+        }
         if context.layout == .minimisize {
             width += 70
         }

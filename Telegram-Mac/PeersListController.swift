@@ -15,10 +15,7 @@ import SwiftSignalKit
 import InAppSettings
 import FetchManager
 
-/// Matches `GeneralContainableRowView.maxBlockWidth` so the peer list column aligns with settings tables.
-private let focusPeerListContentMaxWidth: CGFloat = 600
-private let focusPeerListContentMaxHeight: CGFloat = 900
-private let focusPeerListColumnVerticalMargin: CGFloat = 8
+/// Rounded chrome for the peer list column (Focus); column itself uses full available width/height of the split pane.
 private let focusPeerListColumnCornerRadius: CGFloat = 12
 /// Extra padding above the search field on the dedicated Search tab (Focus fork).
 private let focusSearchTabTopInset: CGFloat = 12
@@ -1718,10 +1715,10 @@ class PeerListContainerView : Control {
         let columnY: CGFloat
         let columnH: CGFloat
         if FocusProduct.isEnabled && state.splitState != .minimisize && state.mode.usesFocusPeerListColumnLayout {
-            contentW = min(focusPeerListContentMaxWidth, size.width)
-            contentX = floorToScreenPixels(backingScaleFactor, (size.width - contentW) / 2)
-            columnH = min(focusPeerListContentMaxHeight, size.height - focusPeerListColumnVerticalMargin * 2)
-            columnY = floorToScreenPixels(backingScaleFactor, (size.height - columnH) / 2)
+            contentW = size.width
+            contentX = 0
+            columnH = size.height
+            columnY = 0
         } else {
             contentW = state.splitState == .minimisize ? 70 : size.width
             contentX = 0

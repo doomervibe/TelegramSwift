@@ -68,7 +68,7 @@ final class FocusAvatarHoverManager {
         // Position in the overlay (which fills the window's content view).
         // X: just inside the right edge of the sidebar strip.
         // Y: centered on the hovered row (rowBoundsInWindow is in window coords).
-        let xPos: CGFloat = leftSidebarWidth - kAvatarSize - kXOffset
+        let xPos: CGFloat = FocusLeftChromeLayout.effectiveWidth - kAvatarSize - kXOffset
         let yPos: CGFloat = positionY(for: rowBoundsInWindow, in: window)
         av.frame = NSMakeRect(xPos, yPos, kAvatarSize, kAvatarSize)
 
