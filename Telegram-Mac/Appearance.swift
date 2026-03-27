@@ -3461,7 +3461,12 @@ private func generateIcons(from palette: ColorPalette, bubbled: Bool) -> Telegra
 func generateTheme(palette: ColorPalette, cloudTheme: TelegramTheme?, bubbled: Bool, fontSize: CGFloat, wallpaper: ThemeWallpaper, backgroundSize: NSSize = NSMakeSize(1040, 1580)) -> TelegramPresentationTheme {
     // Focus: palette.border drives TGUIKit chrome (TableView/Navigation borders, etc.). Match list surface so 1pt fills vanish; alpha-only borders still showed as gray on some views / custom themes.
     let effectivePalette = FocusProduct.isEnabled ? palette.withUpdatedBorder(palette.listBackground) : palette
-    let chatListDragBackground = FocusProduct.isEnabled ? palette.grayForeground : palette.border
+    let chatListDragBackground: NSColor
+    if FocusProduct.isEnabled {
+        chatListDragBackground = effectivePalette.isDark ? effectivePalette.grayHighlight : effectivePalette.grayForeground
+    } else {
+        chatListDragBackground = palette.border
+    }
     
     let chatList = TelegramChatListTheme(selectedBackgroundColor: effectivePalette.accentSelect,
                                          singleLayoutSelectedBackgroundColor: effectivePalette.grayBackground,
@@ -3489,13 +3494,21 @@ func generateTheme(palette: ColorPalette, cloudTheme: TelegramTheme?, bubbled: B
 
 
 func updateTheme(with settings: ThemePaletteSettings, for window: Window? = nil, animated: Bool = false) -> TelegramPresentationTheme {
-    // Focus fork: always use the light white palette (saved theme may still be dayClassic with dark list/chat).
-    let settingsForTheme: ThemePaletteSettings = FocusProduct.isEnabled
-        ? settings.withUpdatedPalette(whitePalette).withUpdatedDefaultIsDark(false)
-        : settings
+    let settingsForTheme: ThemePaletteSettings
+    if FocusProduct.isEnabled {
+        if settings.palette.name == focusTrueBlackPalette.name {
+            settingsForTheme = settings
+        } else {
+            settingsForTheme = settings.withUpdatedPalette(whitePalette).withUpdatedDefaultIsDark(false)
+        }
+    } else {
+        settingsForTheme = settings
+    }
     
     let normalizedSettings: ThemePaletteSettings
-    if settingsForTheme.palette.isDark {
+    if FocusProduct.isEnabled, settingsForTheme.palette.name == focusTrueBlackPalette.name {
+        normalizedSettings = settingsForTheme.withUpdatedDefaultIsDark(true)
+    } else if settingsForTheme.palette.isDark {
         normalizedSettings = settingsForTheme
             .withUpdatedToDefault(dark: false, onlyLocal: true)
             .withUpdatedDefaultIsDark(false)
@@ -3526,6 +3539,12 @@ func updateTheme(with settings: ThemePaletteSettings, for window: Window? = nil,
     case nightAccentPalette.name:
         if normalizedSettings.palette.accent == nightAccentPalette.accent {
             palette = nightAccentPalette
+        } else {
+            palette = normalizedSettings.palette
+        }
+    case focusTrueBlackPalette.name:
+        if normalizedSettings.palette.accent == focusTrueBlackPalette.accent {
+            palette = focusTrueBlackPalette
         } else {
             palette = normalizedSettings.palette
         }

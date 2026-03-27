@@ -21,7 +21,7 @@ FocusProduct.isEnabled // always true in this fork
 - **Mail-like**: full-width messages, no chat bubbles, author name as header, generous vertical spacing
 - **Inbox not chat**: chat list shows "Pinned" / "Inbox" section headers; channels are hidden and surfaced via a Digest banner
 - **Minimal chrome**: no avatars in list rows, no story rings, no emoji/keyboard/gift buttons in composer, no send/read ticks on list rows
-- **Subdued light theme**: light palette locked; no dark mode, no auto-night switching
+- **Default light, optional OLED dark**: usual Focus look is `whitePalette`; **General → Interface** has **OLED dark mode** (`focusTrueBlackPalette`, near-black chrome). No system auto-night switching.
 
 ## Key customisation files
 
@@ -34,5 +34,5 @@ FocusProduct.isEnabled // always true in this fork
 | Message layout (full-width) | `ChatRowItem.swift` |
 | Media placeholders | `ChatFocusMediaPlaceholderItem.swift` |
 | Compose area | `ChatInputView.swift`, `ChatInputActionsView.swift` |
-| Theme lock | `Appearance.swift`, `AppDelegate.swift` |
+| Theme / OLED toggle | `Appearance.swift`, `GeneralSettingsViewController.swift`, `ColorPalette.swift` (`focusTrueBlackPalette`) |
 | Feature flag | `InAppSettings` → `FocusProduct.isEnabled` |

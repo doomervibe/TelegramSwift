@@ -187,25 +187,34 @@ public extension NSColor {
     }
     
     var alpha: CGFloat {
-        var alpha: CGFloat = 0
-        self.getHue(nil, saturation: nil, brightness: nil, alpha: &alpha)
-        return alpha
+        if let c = usingColorSpace(.sRGB) ?? usingColorSpace(.deviceRGB) {
+            return c.alphaComponent
+        }
+        let n = cgColor.numberOfComponents
+        if let comps = cgColor.components, n >= 1 {
+            return comps[n - 1]
+        }
+        return 1
     }
     
+    /// HSV with hue in 0…1 (matches `NSColor.getHue`). Computed from RGB — never calls `getHue`, which can raise `NSColorRaiseWithColorSpaceError` on some macOS versions.
     var hsv: (CGFloat, CGFloat, CGFloat) {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var value: CGFloat = 0.0
-        self.getHue(&hue, saturation: &saturation, brightness: &value, alpha: nil)
-        return (hue, saturation, value)
+        guard let (r, g, b) = rgbTripletForColorMath() else {
+            return (0, 0, 0)
+        }
+        return Self.hsvFromRGBTriplet(r, g, b)
     }
     
     func isTooCloseHSV(to color: NSColor) -> Bool {
-        let hsv1 = abs(self.hsv.0) + abs(self.hsv.1) + abs(self.hsv.2)
-        let hsv2 = abs(color.hsv.0) + abs(color.hsv.1) + abs(color.hsv.2)
-
-        let dif = abs(hsv1 - hsv2)
-        return dif < 0.005
+        guard let (r1, g1, b1) = rgbTripletForColorMath(),
+              let (r2, g2, b2) = color.rgbTripletForColorMath() else {
+            return false
+        }
+        let hsv1 = Self.hsvFromRGBTriplet(r1, g1, b1)
+        let hsv2 = Self.hsvFromRGBTriplet(r2, g2, b2)
+        let sum1 = abs(hsv1.0) + abs(hsv1.1) + abs(hsv1.2)
+        let sum2 = abs(hsv2.0) + abs(hsv2.1) + abs(hsv2.2)
+        return abs(sum1 - sum2) < 0.005
     }
 
     var lightness: CGFloat {
@@ -466,6 +475,46 @@ public extension NSColor {
     
     var underTextColor: NSColor {
         return lightness > 0.8 ? NSColor(0x000000) : NSColor(0xffffff)
+    }
+}
+
+fileprivate extension NSColor {
+    /// Linear RGB (or gray) in a display-ish space for distance / HSV math — avoids `getHue`, which can throw ObjC exceptions on recent macOS.
+    func rgbTripletForColorMath() -> (CGFloat, CGFloat, CGFloat)? {
+        guard let srgb = usingColorSpace(.sRGB) ?? usingColorSpace(.displayP3) ?? usingColorSpace(.deviceRGB) else {
+            return nil
+        }
+        let cg = srgb.cgColor
+        guard let comps = cg.components, !comps.isEmpty else { return nil }
+        let n = cg.numberOfComponents
+        if n >= 3 {
+            return (comps[0], comps[1], comps[2])
+        }
+        let w = comps[0]
+        return (w, w, w)
+    }
+
+    /// Hue 0…1, saturation 0…1, value 0…1 — aligned with `NSColor.getHue(_:saturation:brightness:alpha:)`.
+    static func hsvFromRGBTriplet(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
+        let maxV = max(max(r, g), b)
+        let minV = min(min(r, g), b)
+        let delta = maxV - minV
+        let v = maxV
+        let s = maxV > 0 ? delta / maxV : 0
+        let h: CGFloat
+        if delta == 0 {
+            h = 0
+        } else if maxV == r {
+            var hh = (g - b) / delta
+            hh = hh.truncatingRemainder(dividingBy: 6)
+            if hh < 0 { hh += 6 }
+            h = hh / 6
+        } else if maxV == g {
+            h = ((b - r) / delta + 2) / 6
+        } else {
+            h = ((r - g) / delta + 4) / 6
+        }
+        return (h, s, v)
     }
 }
 

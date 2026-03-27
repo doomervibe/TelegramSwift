@@ -13,6 +13,8 @@ import InAppSettings
 import SwiftSignalKit
 import Postbox
 import Localization
+import ThemeSettings
+import ColorPalette
 
 /// Top breathing room inside the settings table (Focus, zero nav bar) — not a separate sibling view.
 /// Windowed: compact; fullscreen: extra air under the menu bar / safe area.
@@ -57,6 +59,7 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
     case callSettings(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
     case previewChats(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
     case previewChatsInfo(sectionId:Int)
+    case focusOledDarkMode(sectionId: Int, enabled: Bool, viewType: GeneralViewType)
     case showProfileId(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
     var stableId: Int {
         switch self {
@@ -116,6 +119,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
             return 25
         case .previewChatsInfo:
             return 26
+        case .focusOledDarkMode:
+            return 27
         case let .section(id):
             return (id + 1) * 1000 - id
         }
@@ -178,6 +183,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
         case let .previewChatsInfo(sectionId):
             return (sectionId * 1000) + stableId
         case let .showProfileId(sectionId, _, _):
+            return (sectionId * 1000) + stableId
+        case let .focusOledDarkMode(sectionId, _, _):
             return (sectionId * 1000) + stableId
         case let .section(id):
             return (id + 1) * 1000 - id
@@ -288,6 +295,10 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
             return GeneralInteractedRowItem(initialSize, name: strings().generalSettingsShowProfileIdText, type: .switchable(value), viewType: viewType, action: arguments.showProfileId)
         case let .previewChats(_, value, viewType):
             return GeneralInteractedRowItem(initialSize, name: strings().generalSettingsPreviewChatsText, type: .switchable(value), viewType: viewType, action: arguments.togglePreviewChat)
+        case let .focusOledDarkMode(_, enabled, viewType):
+            return GeneralInteractedRowItem(initialSize, name: FocusStrings.oledDarkMode, type: .switchable(enabled), viewType: viewType, action: {
+                arguments.toggleFocusOledDark(!enabled)
+            })
         case .previewChatsInfo:
             return GeneralTextRowItem(initialSize, stableId: stableId, text: strings().generalSettingsPreviewChatsInfo, viewType: .textBottomItem)
         }
@@ -320,8 +331,9 @@ private final class GeneralSettingsArguments {
     let openLiteMode: ()->Void
     let toggleSpellingKey:(String)->Void
     let showProfileId:()->Void
+    let toggleFocusOledDark: (Bool) -> Void
     let togglePreviewChat:()->Void
-    init(context:AccountContext, toggleCallsTab:@escaping(Bool)-> Void, toggleInAppKeys: @escaping(Bool) -> Void, toggleInput: @escaping(SendingType)-> Void, toggleSidebar: @escaping (Bool) -> Void, toggleInAppSounds: @escaping (Bool) -> Void, toggleEmojiReplacements:@escaping(Bool) -> Void, toggleForceTouchAction: @escaping(ForceTouchAction)->Void, toggleInstantViewScrollBySpace: @escaping(Bool)->Void, toggleAutoplayGifs:@escaping(Bool) -> Void, toggleEmojiPrediction: @escaping(Bool) -> Void, toggleBigEmoji: @escaping(Bool) -> Void, toggleStatusBar: @escaping(Bool) -> Void, toggleRTFEnabled: @escaping(Bool)->Void, toggleLargePhotos: @escaping(Bool) -> Void, acceptSecretChats: @escaping(Bool)->Void, toggleWorkMode:@escaping(Bool)->Void, openShortcuts: @escaping()->Void, callSettings: @escaping() ->Void, openLiteMode: @escaping()->Void, toggleSpellingKey:@escaping(String)->Void, showProfileId:@escaping()->Void, togglePreviewChat:@escaping()->Void) {
+    init(context:AccountContext, toggleCallsTab:@escaping(Bool)-> Void, toggleInAppKeys: @escaping(Bool) -> Void, toggleInput: @escaping(SendingType)-> Void, toggleSidebar: @escaping (Bool) -> Void, toggleInAppSounds: @escaping (Bool) -> Void, toggleEmojiReplacements:@escaping(Bool) -> Void, toggleForceTouchAction: @escaping(ForceTouchAction)->Void, toggleInstantViewScrollBySpace: @escaping(Bool)->Void, toggleAutoplayGifs:@escaping(Bool) -> Void, toggleEmojiPrediction: @escaping(Bool) -> Void, toggleBigEmoji: @escaping(Bool) -> Void, toggleStatusBar: @escaping(Bool) -> Void, toggleRTFEnabled: @escaping(Bool)->Void, toggleLargePhotos: @escaping(Bool) -> Void, acceptSecretChats: @escaping(Bool)->Void, toggleWorkMode:@escaping(Bool)->Void, openShortcuts: @escaping()->Void, callSettings: @escaping() ->Void, openLiteMode: @escaping()->Void, toggleSpellingKey:@escaping(String)->Void, showProfileId:@escaping()->Void, toggleFocusOledDark: @escaping (Bool) -> Void, togglePreviewChat:@escaping()->Void) {
         self.context = context
         self.toggleCallsTab = toggleCallsTab
         self.toggleInAppKeys = toggleInAppKeys
@@ -343,6 +355,7 @@ private final class GeneralSettingsArguments {
         self.openLiteMode = openLiteMode
         self.toggleSpellingKey = toggleSpellingKey
         self.showProfileId = showProfileId
+        self.toggleFocusOledDark = toggleFocusOledDark
         self.togglePreviewChat = togglePreviewChat
         self.toggleLargePhotos = toggleLargePhotos
     }
@@ -414,7 +427,9 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
         entries.append(.statusBar(sectionId: sectionId, enabled: baseSettings.statusBar, viewType: .innerItem))
         entries.append(.previewChats(sectionId: sectionId, enabled: additionalSettings.previewChats, viewType: .lastItem))
     } else {
-        entries.append(.statusBar(sectionId: sectionId, enabled: baseSettings.statusBar, viewType: .firstItem))
+        let oledOn = appearance.presentation.colors.name == focusTrueBlackPalette.name
+        entries.append(.focusOledDarkMode(sectionId: sectionId, enabled: oledOn, viewType: .firstItem))
+        entries.append(.statusBar(sectionId: sectionId, enabled: baseSettings.statusBar, viewType: .innerItem))
         entries.append(.previewChats(sectionId: sectionId, enabled: additionalSettings.previewChats, viewType: .lastItem))
     }
     entries.append(.previewChatsInfo(sectionId: sectionId))
@@ -585,6 +600,14 @@ class GeneralSettingsViewController: TableViewController {
             UserDefaults.standard.set(!UserDefaults.standard.bool(forKey: key), forKey: key)
         }, showProfileId: {
             FastSettings.canViewPeerId = !FastSettings.canViewPeerId
+        }, toggleFocusOledDark: { enable in
+            _ = updateThemeInteractivetly(accountManager: context.sharedContext.accountManager) { settings in
+                if enable {
+                    return settings.withUpdatedPalette(focusTrueBlackPalette).withUpdatedDefaultIsDark(true)
+                } else {
+                    return settings.withUpdatedPalette(whitePalette).withUpdatedDefaultIsDark(false)
+                }
+            }.start()
         }, togglePreviewChat: {
             _ = updateAdditionalSettingsInteractively(accountManager: context.sharedContext.accountManager, {
                 $0.withUpdatedPreviewChats(!$0.previewChats)

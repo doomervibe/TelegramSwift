@@ -176,6 +176,7 @@ enum FocusStrings {
         let link: String
         let applyForFocusFilter: String
         let focusFilterEmojiInfo: String
+        let oledDarkMode: String
     }
     
     private static var language: SupportedLanguage {
@@ -227,7 +228,8 @@ enum FocusStrings {
                 unknown: "Unknown",
                 link: "Link",
                 applyForFocusFilter: "Apply for Focus Filter",
-                focusFilterEmojiInfo: "This emoji will be used for system Focus Mode"
+                focusFilterEmojiInfo: "This emoji will be used for system Focus Mode",
+                oledDarkMode: "OLED dark mode"
             )
         case .de:
             return Catalog(
@@ -250,7 +252,8 @@ enum FocusStrings {
                 unknown: "Unbekannt",
                 link: "Link",
                 applyForFocusFilter: "Auf Focus-Filter anwenden",
-                focusFilterEmojiInfo: "Dieses Emoji wird für den systemweiten Fokusmodus verwendet"
+                focusFilterEmojiInfo: "Dieses Emoji wird für den systemweiten Fokusmodus verwendet",
+                oledDarkMode: "OLED-Dunkelmodus"
             )
         case .es:
             return Catalog(
@@ -273,7 +276,8 @@ enum FocusStrings {
                 unknown: "Desconocido",
                 link: "Enlace",
                 applyForFocusFilter: "Aplicar al filtro Focus",
-                focusFilterEmojiInfo: "Este emoji se usará para el modo Focus del sistema"
+                focusFilterEmojiInfo: "Este emoji se usará para el modo Focus del sistema",
+                oledDarkMode: "Modo oscuro OLED"
             )
         case .it:
             return Catalog(
@@ -296,7 +300,8 @@ enum FocusStrings {
                 unknown: "Sconosciuto",
                 link: "Link",
                 applyForFocusFilter: "Applica al filtro Focus",
-                focusFilterEmojiInfo: "Questa emoji verrà usata per la modalità Focus di sistema"
+                focusFilterEmojiInfo: "Questa emoji verrà usata per la modalità Focus di sistema",
+                oledDarkMode: "Modalità scura OLED"
             )
         case .nl:
             return Catalog(
@@ -319,7 +324,8 @@ enum FocusStrings {
                 unknown: "Onbekend",
                 link: "Link",
                 applyForFocusFilter: "Toepassen op Focus-filter",
-                focusFilterEmojiInfo: "Deze emoji wordt gebruikt voor de Focus-modus van het systeem"
+                focusFilterEmojiInfo: "Deze emoji wordt gebruikt voor de Focus-modus van het systeem",
+                oledDarkMode: "OLED-donkere modus"
             )
         case .ptBR:
             return Catalog(
@@ -342,7 +348,8 @@ enum FocusStrings {
                 unknown: "Desconhecido",
                 link: "Link",
                 applyForFocusFilter: "Aplicar ao filtro Focus",
-                focusFilterEmojiInfo: "Este emoji será usado para o modo Focus do sistema"
+                focusFilterEmojiInfo: "Este emoji será usado para o modo Focus do sistema",
+                oledDarkMode: "Modo escuro OLED"
             )
         case .ru:
             return Catalog(
@@ -365,7 +372,8 @@ enum FocusStrings {
                 unknown: "Неизвестно",
                 link: "Ссылка",
                 applyForFocusFilter: "Применить к фильтру Focus",
-                focusFilterEmojiInfo: "Этот эмодзи будет использоваться для системного режима Focus"
+                focusFilterEmojiInfo: "Этот эмодзи будет использоваться для системного режима Focus",
+                oledDarkMode: "Тёмная OLED-тема"
             )
         case .uk:
             return Catalog(
@@ -388,7 +396,8 @@ enum FocusStrings {
                 unknown: "Невідомо",
                 link: "Посилання",
                 applyForFocusFilter: "Застосувати до фільтра Focus",
-                focusFilterEmojiInfo: "Цей емодзі використовуватиметься для системного режиму Focus"
+                focusFilterEmojiInfo: "Цей емодзі використовуватиметься для системного режиму Focus",
+                oledDarkMode: "Темна OLED-тема"
             )
         }
     }
@@ -413,6 +422,7 @@ enum FocusStrings {
     static var link: String { catalog.link }
     static var applyForFocusFilter: String { catalog.applyForFocusFilter }
     static var focusFilterEmojiInfo: String { catalog.focusFilterEmojiInfo }
+    static var oledDarkMode: String { catalog.oledDarkMode }
     
     static func digestChannelCount(_ count: Int) -> String {
         switch language {
