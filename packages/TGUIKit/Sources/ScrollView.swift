@@ -46,14 +46,37 @@ public func ==(lhs:ScrollPosition, rhs:ScrollPosition) -> Bool {
 
 final class Scroller : NSScroller {
     weak var scrollView: NSScrollView?
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = false
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = false
+    }
+    
+    override class var isCompatibleWithOverlayScrollers: Bool {
+        true
+    }
+    
+    /// Default implementation draws the full-height rail (thin gray line). Skip it — only the knob should show.
+    override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {
+    }
+    
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.set()
-        dirtyRect.fill()
-        if let scrollView = self.scrollView {
-            if scrollView.contentView.documentRect.height > scrollView.frame.height {
-                self.drawKnob()
-            }
+        bounds.fill()
+        guard let scrollView = self.scrollView else {
+            return
         }
+        let docH = scrollView.contentView.documentRect.height
+        let visibleH = scrollView.contentView.bounds.height
+        guard docH > visibleH + 0.5 else {
+            return
+        }
+        super.drawKnob()
     }
 }
 
@@ -210,11 +233,11 @@ open class ScrollView: NSScrollView{
         
         self.scrollerStyle = .overlay
          
-         if NSScroller.preferredScrollerStyle == .legacy {
-             let scroller = Scroller()
-             scroller.scrollView = self
-             self.verticalScroller = scroller
-         } 
+        // Stock NSScroller draws a full-height track (gray gutter). Use a clear slot + knob only
+        // so list backgrounds stay uniform (Focus white chrome, overlay scrollers).
+        let scroller = Scroller()
+        scroller.scrollView = self
+        self.verticalScroller = scroller
  
     }
     

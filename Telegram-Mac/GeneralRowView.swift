@@ -8,6 +8,7 @@
 
 import Cocoa
 import TGUIKit
+import InAppSettings
 
 
 class GeneralContainableRowView : TableRowView {
@@ -48,6 +49,9 @@ class GeneralContainableRowView : TableRowView {
     }
     
     override var borderColor: NSColor {
+        if FocusProduct.isEnabled {
+            return theme.colors.listBackground
+        }
         return theme.colors.border
     }
     

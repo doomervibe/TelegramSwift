@@ -317,16 +317,18 @@ class MainViewController: TelegramViewController {
     
     override func loadView() {
         
-        navigation.hasBarRightBorder = true
+        // Focus: no gray vertical rule between list column and detail — chrome is flat white.
+        let listColumnRightRule = !FocusProduct.isEnabled
+        navigation.hasBarRightBorder = listColumnRightRule
         navigation.hasBarLeftBorder = true
         
         self.contacts.applyAppearOnLoad = false
-        self.contacts.hasBarRightBorder = true
+        self.contacts.hasBarRightBorder = listColumnRightRule
         self.contacts.hasBarLeftBorder = true
         self.contacts._frameRect = self._frameRect
 
         self.search.applyAppearOnLoad = false
-        self.search.hasBarRightBorder = true
+        self.search.hasBarRightBorder = listColumnRightRule
         self.search.hasBarLeftBorder = true
         self.search._frameRect = self._frameRect
 

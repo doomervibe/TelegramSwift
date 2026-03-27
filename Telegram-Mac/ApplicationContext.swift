@@ -221,8 +221,14 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
     }
     
     func applyNewTheme() {
-        rightController.backgroundColor = theme.colors.background
-        rightController.backgroundMode = theme.controllerBackgroundMode
+        if FocusProduct.isEnabled {
+            let t = theme as! TelegramPresentationTheme
+            rightController.backgroundColor = t.colors.listBackground
+            rightController.backgroundMode = .color(color: t.colors.listBackground)
+        } else {
+            rightController.backgroundColor = theme.colors.background
+            rightController.backgroundMode = theme.controllerBackgroundMode
+        }
         view.updateLocalizationAndTheme(theme: theme)
     }
     
@@ -774,6 +780,7 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
             .contacts:    FocusStrings.contacts,
             .search:      FocusStrings.search,
             .stories:     FocusStrings.stories,
+            .settings:    FocusStrings.settings,
         ]
         leftController.chatList.updateCategoryUI(for: titleMap[category])
         

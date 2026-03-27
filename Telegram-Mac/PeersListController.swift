@@ -1070,7 +1070,7 @@ class PeerListContainerView : Control {
     /// Gray rounded plate behind the peer list column (Focus + plain mode only).
     private let focusColumnChromeView = View(frame: .zero)
     
-    let tableView = TableView(frame:NSZeroRect, drawBorder: true)
+    let tableView = TableView(frame: NSZeroRect, drawBorder: !FocusProduct.isEnabled)
     
     
     private let containerView = Control()
@@ -1143,7 +1143,11 @@ class PeerListContainerView : Control {
         addSubview(borderView)
         
         tableView.getBackgroundColor = {
-            .clear
+            // Clear lets the system scroller gutter show through as a gray strip; match the column in Focus.
+            if FocusProduct.isEnabled {
+                return presentation.colors.listBackground
+            }
+            return .clear
         }
         
         titleView.scaleOnClick = true
@@ -2180,7 +2184,7 @@ private class SearchContainer : Control {
         super.init(frame: frameRect)
         addSubview(tagsView)
         addSubview(searchView)
-        border = [.Right]
+        border = FocusProduct.isEnabled ? [] : [.Right]
     }
     
     override var sendRightMouseAnyway: Bool {

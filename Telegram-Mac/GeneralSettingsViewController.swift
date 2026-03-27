@@ -12,9 +12,24 @@ import TelegramCore
 import InAppSettings
 import SwiftSignalKit
 import Postbox
+import Localization
 
+/// Top breathing room inside the settings table (Focus, zero nav bar) — not a separate sibling view.
+/// Windowed: compact; fullscreen: extra air under the menu bar / safe area.
+private func resolvedFocusGeneralSettingsTopSpacerHeight(for window: NSWindow?) -> CGFloat {
+    guard let w = window else { return 12 }
+    guard w.styleMask.contains(.fullScreen) else { return 12 }
+    if #available(macOS 11.0, *) {
+        let safeTop = w.contentView?.safeAreaInsets.top ?? 0
+        if safeTop > 0.5 {
+            return max(28, 12 + safeTop)
+        }
+    }
+    return 40
+}
 
 private enum GeneralSettingsEntry : Comparable, Identifiable {
+    case focusTableTopSpacer(height: CGFloat)
     case section(sectionId:Int)
     case header(sectionId: Int, uniqueId:Int, text:String)
     case liteMode(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
@@ -45,6 +60,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
     case showProfileId(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
     var stableId: Int {
         switch self {
+        case .focusTableTopSpacer:
+            return -9_002
         case let .header(_, uniqueId, _):
             return uniqueId
         case .liteMode:
@@ -106,6 +123,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
     
     var sortIndex:Int {
         switch self {
+        case .focusTableTopSpacer:
+            return -2
         case let .header(sectionId, _, _):
             return (sectionId * 1000) + stableId
         case let .liteMode(sectionId, _, _):
@@ -167,6 +186,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
     
     func item(_ arguments:GeneralSettingsArguments, initialSize:NSSize) -> TableRowItem {
         switch self {
+        case let .focusTableTopSpacer(height):
+            return GeneralRowItem(initialSize, height: height, stableId: stableId, viewType: .legacy, action: {}, drawCustomSeparator: false, backgroundColor: theme.colors.listBackground)
         case .section:
             return GeneralRowItem(initialSize, height: 20, stableId: stableId, viewType: .separator)
         case let .header(sectionId: _, uniqueId: _, text: text):
@@ -328,11 +349,15 @@ private final class GeneralSettingsArguments {
    
 }
 
-private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSettings: BaseApplicationSettings, appearance: Appearance, launchSettings: LaunchSettings, secretChatSettings: SecretChatSettings, additionalSettings: AdditionalSettings) -> [GeneralSettingsEntry] {
+private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSettings: BaseApplicationSettings, appearance: Appearance, launchSettings: LaunchSettings, secretChatSettings: SecretChatSettings, additionalSettings: AdditionalSettings, focusTopSpacerHeight: CGFloat) -> [GeneralSettingsEntry] {
     var sectionId:Int = 1
     var entries:[GeneralSettingsEntry] = []
     
     var headerUnique:Int = -1
+    
+    if FocusProduct.isEnabled {
+        entries.append(.focusTableTopSpacer(height: focusTopSpacerHeight))
+    }
     
     if !FocusProduct.isEnabled {
         entries.append(.section(sectionId: sectionId))
@@ -470,13 +495,32 @@ private func prepareEntries(left: [AppearanceWrapperEntry<GeneralSettingsEntry>]
 class GeneralSettingsViewController: TableViewController {
     
     private let disposable = MetaDisposable()
+    private let focusTopSpacerHeightPromise = ValuePromise<CGFloat>(12, ignoreRepeated: true)
+    private var focusLayoutObservers: [NSObjectProtocol] = []
     override var removeAfterDisapper:Bool {
         return false
     }
     
+    override init(_ context: AccountContext) {
+        super.init(context)
+        if FocusProduct.isEnabled {
+            bar = .init(height: 0)
+        }
+    }
+    
+    override var defaultBarTitle: String {
+        strings().generalSettingsGeneralSettings
+    }
+    
+    override func escapeKeyAction() -> KeyHandlerResult {
+        if FocusProduct.isEnabled {
+            return .invoked
+        }
+        return super.escapeKeyAction()
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        
        
         let context = self.context
         let inputPromise:ValuePromise<SendingType> = ValuePromise(FastSettings.sendingType, ignoreRepeated: true)
@@ -553,13 +597,13 @@ class GeneralSettingsViewController: TableViewController {
         
         let baseSettingsSignal: Signal<BaseApplicationSettings, NoError> = .single(context.sharedContext.baseSettings) |> then(baseAppSettings(accountManager: context.sharedContext.accountManager))
         
-        let signal = combineLatest(queue: prepareQueue, baseSettingsSignal, inputPromise.get(), forceTouchPromise.get(), appearanceSignal, appLaunchSettings(postbox: context.account.postbox), context.account.postbox.preferencesView(keys: [PreferencesKeys.secretChatSettings]), additionalSettings(accountManager: context.sharedContext.accountManager)) |> map { settings, _, _, appearance, launchSettings, preferencesView, additionalSettings -> TableUpdateTransition in
+        let signal = combineLatest(queue: prepareQueue, baseSettingsSignal, inputPromise.get(), forceTouchPromise.get(), appearanceSignal, appLaunchSettings(postbox: context.account.postbox), context.account.postbox.preferencesView(keys: [PreferencesKeys.secretChatSettings]), additionalSettings(accountManager: context.sharedContext.accountManager), focusTopSpacerHeightPromise.get()) |> map { settings, _, _, appearance, launchSettings, preferencesView, additionalSettings, focusTopSpacerHeight -> TableUpdateTransition in
             
             let baseSettings: BaseApplicationSettings = settings
             
             let secretChatSettings = preferencesView.values[PreferencesKeys.secretChatSettings]?.get(SecretChatSettings.self) ?? SecretChatSettings.defaultSettings
             
-            let entries = generalSettingsEntries(arguments: arguments, baseSettings: baseSettings, appearance: appearance, launchSettings: launchSettings, secretChatSettings: secretChatSettings, additionalSettings: additionalSettings).map({AppearanceWrapperEntry(entry: $0, appearance: appearance)})
+            let entries = generalSettingsEntries(arguments: arguments, baseSettings: baseSettings, appearance: appearance, launchSettings: launchSettings, secretChatSettings: secretChatSettings, additionalSettings: additionalSettings, focusTopSpacerHeight: focusTopSpacerHeight).map({AppearanceWrapperEntry(entry: $0, appearance: appearance)})
             let previous = previos.swap(entries)
             return prepareEntries(left: previous, right: entries, arguments: arguments, initialSize: initialSize.modify({$0}))
             
@@ -569,7 +613,21 @@ class GeneralSettingsViewController: TableViewController {
             self?.genericView.merge(with:  transition)
             self?.readyOnce()
         }))
+        
+        publishFocusSettingsTopSpacerHeight()
                 
+    }
+    
+    private func publishFocusSettingsTopSpacerHeight() {
+        guard FocusProduct.isEnabled else { return }
+        focusTopSpacerHeightPromise.set(resolvedFocusGeneralSettingsTopSpacerHeight(for: window))
+    }
+    
+    private func removeFocusLayoutObservers() {
+        for o in focusLayoutObservers {
+            NotificationCenter.default.removeObserver(o)
+        }
+        focusLayoutObservers.removeAll()
     }
     
     private var loggerClickCount = 0
@@ -580,19 +638,38 @@ class GeneralSettingsViewController: TableViewController {
     }
     
     deinit {
+        removeFocusLayoutObservers()
         disposable.dispose()
     }
 
     
     override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)        
+        super.viewDidAppear(animated)
+        guard FocusProduct.isEnabled else { return }
+        publishFocusSettingsTopSpacerHeight()
+        guard let w = window, focusLayoutObservers.isEmpty else { return }
+        let nc = NotificationCenter.default
+        focusLayoutObservers.append(nc.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: w, queue: .main) { [weak self] _ in
+            self?.publishFocusSettingsTopSpacerHeight()
+        })
+        focusLayoutObservers.append(nc.addObserver(forName: NSWindow.didExitFullScreenNotification, object: w, queue: .main) { [weak self] _ in
+            self?.publishFocusSettingsTopSpacerHeight()
+        })
     }
     
 
     
     override func viewWillDisappear(_ animated: Bool) {
+        removeFocusLayoutObservers()
         super.viewWillDisappear(animated)
         window?.removeAllHandlers(for: self)
+    }
+    
+    override func viewDidResized(_ size: NSSize) {
+        super.viewDidResized(size)
+        if FocusProduct.isEnabled {
+            publishFocusSettingsTopSpacerHeight()
+        }
     }
    
 }

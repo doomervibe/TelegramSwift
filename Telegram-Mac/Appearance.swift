@@ -3459,40 +3459,48 @@ private func generateIcons(from palette: ColorPalette, bubbled: Bool) -> Telegra
 
 
 func generateTheme(palette: ColorPalette, cloudTheme: TelegramTheme?, bubbled: Bool, fontSize: CGFloat, wallpaper: ThemeWallpaper, backgroundSize: NSSize = NSMakeSize(1040, 1580)) -> TelegramPresentationTheme {
+    // Focus: palette.border drives TGUIKit chrome (TableView/Navigation borders, etc.). Match list surface so 1pt fills vanish; alpha-only borders still showed as gray on some views / custom themes.
+    let effectivePalette = FocusProduct.isEnabled ? palette.withUpdatedBorder(palette.listBackground) : palette
+    let chatListDragBackground = FocusProduct.isEnabled ? palette.grayForeground : palette.border
     
-    let chatList = TelegramChatListTheme(selectedBackgroundColor: palette.accentSelect,
-                                         singleLayoutSelectedBackgroundColor: palette.grayBackground,
-                                         activeDraggingBackgroundColor: palette.border,
-                                         pinnedBackgroundColor: palette.background,
-                                         contextMenuBackgroundColor: palette.background,
-                                         textColor: palette.text,
-                                         grayTextColor: palette.grayText,
-                                         secretChatTextColor: palette.accent,
-                                         peerTextColor: palette.text,
-                                         activityColor: palette.accent,
-                                         activitySelectedColor: palette.underSelectedColor,
-                                         activityContextMenuColor: palette.accent,
-                                         activityPinnedColor: palette.accent,
-                                         badgeTextColor: palette.background,
-                                         badgeBackgroundColor: palette.badge,
-                                         badgeSelectedTextColor: palette.accentSelect,
-                                         badgeSelectedBackgroundColor: palette.underSelectedColor,
+    let chatList = TelegramChatListTheme(selectedBackgroundColor: effectivePalette.accentSelect,
+                                         singleLayoutSelectedBackgroundColor: effectivePalette.grayBackground,
+                                         activeDraggingBackgroundColor: chatListDragBackground,
+                                         pinnedBackgroundColor: effectivePalette.background,
+                                         contextMenuBackgroundColor: effectivePalette.background,
+                                         textColor: effectivePalette.text,
+                                         grayTextColor: effectivePalette.grayText,
+                                         secretChatTextColor: effectivePalette.accent,
+                                         peerTextColor: effectivePalette.text,
+                                         activityColor: effectivePalette.accent,
+                                         activitySelectedColor: effectivePalette.underSelectedColor,
+                                         activityContextMenuColor: effectivePalette.accent,
+                                         activityPinnedColor: effectivePalette.accent,
+                                         badgeTextColor: effectivePalette.background,
+                                         badgeBackgroundColor: effectivePalette.badge,
+                                         badgeSelectedTextColor: effectivePalette.accentSelect,
+                                         badgeSelectedBackgroundColor: effectivePalette.underSelectedColor,
                                          badgeMutedTextColor: .white,
-                                         badgeMutedBackgroundColor: palette.badgeMuted)
+                                         badgeMutedBackgroundColor: effectivePalette.badgeMuted)
     
-    let tabBar = TelegramTabBarTheme(color: palette.grayIcon, selectedColor: palette.accentIcon, badgeTextColor: .white, badgeColor: palette.redUI)
-    return TelegramPresentationTheme(colors: palette, cloudTheme: cloudTheme, search: SearchTheme(palette.grayBackground, #imageLiteral(resourceName: "Icon_SearchField").precomposed(palette.grayIcon), #imageLiteral(resourceName: "Icon_SearchClear").precomposed(palette.grayIcon), { strings().searchFieldSearch }, palette.text, palette.grayText), chatList: chatList, tabBar: tabBar, icons: generateIcons(from: palette, bubbled: bubbled), bubbled: bubbled, fontSize: fontSize, wallpaper: wallpaper, generated: true, backgroundSize: backgroundSize)
+    let tabBar = TelegramTabBarTheme(color: effectivePalette.grayIcon, selectedColor: effectivePalette.accentIcon, badgeTextColor: .white, badgeColor: effectivePalette.redUI)
+    return TelegramPresentationTheme(colors: effectivePalette, cloudTheme: cloudTheme, search: SearchTheme(effectivePalette.grayBackground, #imageLiteral(resourceName: "Icon_SearchField").precomposed(effectivePalette.grayIcon), #imageLiteral(resourceName: "Icon_SearchClear").precomposed(effectivePalette.grayIcon), { strings().searchFieldSearch }, effectivePalette.text, effectivePalette.grayText), chatList: chatList, tabBar: tabBar, icons: generateIcons(from: effectivePalette, bubbled: bubbled), bubbled: bubbled, fontSize: fontSize, wallpaper: wallpaper, generated: true, backgroundSize: backgroundSize)
 }
 
 
 func updateTheme(with settings: ThemePaletteSettings, for window: Window? = nil, animated: Bool = false) -> TelegramPresentationTheme {
+    // Focus fork: always use the light white palette (saved theme may still be dayClassic with dark list/chat).
+    let settingsForTheme: ThemePaletteSettings = FocusProduct.isEnabled
+        ? settings.withUpdatedPalette(whitePalette).withUpdatedDefaultIsDark(false)
+        : settings
+    
     let normalizedSettings: ThemePaletteSettings
-    if settings.palette.isDark {
-        normalizedSettings = settings
+    if settingsForTheme.palette.isDark {
+        normalizedSettings = settingsForTheme
             .withUpdatedToDefault(dark: false, onlyLocal: true)
             .withUpdatedDefaultIsDark(false)
     } else {
-        normalizedSettings = settings.withUpdatedDefaultIsDark(false)
+        normalizedSettings = settingsForTheme.withUpdatedDefaultIsDark(false)
     }
     
     let palette: ColorPalette
@@ -3572,7 +3580,8 @@ func telegramUpdateTheme(_ theme: TelegramPresentationTheme, window: Window? = n
 }
 
 func setDefaultTheme(for window: Window? = nil) {
-    telegramUpdateTheme(generateTheme(palette: dayClassicPalette, cloudTheme: nil, bubbled: false, fontSize: 13.0, wallpaper: ThemeWallpaper()), window: window, animated: false)
+    let palette = FocusProduct.isEnabled ? whitePalette : dayClassicPalette
+    telegramUpdateTheme(generateTheme(palette: palette, cloudTheme: nil, bubbled: false, fontSize: 13.0, wallpaper: ThemeWallpaper()), window: window, animated: false)
 }
 
 func generateWebAppThemeParams(_ presentationTheme: PresentationTheme) -> [String: Any] {

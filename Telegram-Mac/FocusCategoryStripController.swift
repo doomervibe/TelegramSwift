@@ -119,7 +119,6 @@ private final class FocusStripButton: Control {
 
 final class FocusCategoryStripView: View {
     fileprivate let categoryStack = View()
-    fileprivate let settingsRow = View()
     private let borderLine = View()
 
     static let topInset: CGFloat = 52
@@ -128,7 +127,6 @@ final class FocusCategoryStripView: View {
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         addSubview(categoryStack)
-        addSubview(settingsRow)
         addSubview(borderLine)
         refreshColors()
     }
@@ -139,7 +137,6 @@ final class FocusCategoryStripView: View {
         let w = frame.width - 1
         let stackH = CGFloat(categoryStack.subviews.count) * FocusCategoryStripView.rowHeight
         categoryStack.frame = NSMakeRect(0, FocusCategoryStripView.topInset, w, stackH)
-        settingsRow.frame = NSMakeRect(0, frame.height - FocusCategoryStripView.rowHeight - 12, w, FocusCategoryStripView.rowHeight)
         borderLine.frame = NSMakeRect(frame.width - 1, 0, 1, frame.height)
     }
 
@@ -151,7 +148,6 @@ final class FocusCategoryStripView: View {
     private func refreshColors() {
         backgroundColor = theme.colors.listBackground
         categoryStack.backgroundColor = theme.colors.listBackground
-        settingsRow.backgroundColor = theme.colors.listBackground
         borderLine.backgroundColor = theme.colors.border
     }
 }
@@ -209,6 +205,7 @@ final class FocusCategoryStripController: TelegramGenericViewController<FocusCat
             (.contacts,    FocusStrings.contacts,   "person.2"),
             (.search,      FocusStrings.search,     "magnifyingglass"),
             (.stories,     FocusStrings.stories,    "sparkles"),
+            (.settings,    FocusStrings.settings,   "gearshape"),
         ]
 
         // Rebuild category stack
@@ -223,12 +220,6 @@ final class FocusCategoryStripController: TelegramGenericViewController<FocusCat
             row.frame = NSMakeRect(0, CGFloat(i) * rowH, w, rowH)
             gv.categoryStack.addSubview(row)
         }
-
-        // Rebuild settings row
-        gv.settingsRow.subviews.forEach { $0.removeFromSuperview() }
-        let sr = makeCategoryRow(width: w, height: rowH, category: .settings, label: FocusStrings.settings, symbolName: "gearshape", badgeCount: 0)
-        sr.frame = NSMakeRect(0, 0, w, rowH)
-        gv.settingsRow.addSubview(sr)
 
         gv.needsLayout = true
     }

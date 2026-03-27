@@ -748,9 +748,7 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     
     public var getBackgroundColor:()->NSColor = { presentation.colors.background } {
         didSet {
-            if super.layer?.backgroundColor != .clear {
-                super.layer?.backgroundColor = self.getBackgroundColor().cgColor
-            }
+            super.layer?.backgroundColor = self.getBackgroundColor().cgColor
             self.needsDisplay = true
 
         }
@@ -859,9 +857,7 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     }
     
     open func updateLocalizationAndTheme(theme: PresentationTheme) {
-        if super.layer?.backgroundColor != .clear {
-            super.layer?.backgroundColor = self.getBackgroundColor().cgColor
-        }
+        super.layer?.backgroundColor = self.getBackgroundColor().cgColor
         stickView?.updateColors()
         rightBorder?.backgroundColor = theme.colors.border
         //tableView.background = .clear

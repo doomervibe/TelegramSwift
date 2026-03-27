@@ -1091,17 +1091,29 @@ class ChatControllerView : View, ChatInputDelegate {
 
         state.measure(frame.width - (interfaceState.monoforumState == .vertical ? 80 : 0))
 
+        let focusSavedExtraTableTop: CGFloat = {
+            guard FocusProduct.isEnabled, chatInteraction.mode == .history else { return 0 }
+            switch chatInteraction.chatLocation {
+            case let .peer(pid) where pid == chatInteraction.context.peerId:
+                return 12
+            case let .thread(data) where data.peerId == chatInteraction.context.peerId:
+                return 12
+            default:
+                return 0
+            }
+        }()
+
         header.updateState(state, animated: animated, for: self, inset: interfaceState.monoforumState == .vertical ? 80 : 0, relativeView: self.monoforum_HorizontalView)
         
-        tableView.updateStickInset(state.height - state.toleranceHeight + (interfaceState.monoforumState == .horizontal ? 40 : 0), animated: animated)
+        tableView.updateStickInset(state.height - state.toleranceHeight + (interfaceState.monoforumState == .horizontal ? 40 : 0) + focusSavedExtraTableTop, animated: animated)
 
         if superview != nil {
             updateFrame(frame, transition: animated ? .animated(duration: 0.2, curve: .easeOut) : .immediate)
         }
         if let count = interfaceState.historyCount, count > 0 {
-            tableView.contentInsets = .init(top: state.height)
+            tableView.contentInsets = .init(top: state.height + focusSavedExtraTableTop)
         } else {
-            tableView.contentInsets = .init(top: 0)
+            tableView.contentInsets = .init(top: focusSavedExtraTableTop)
         }
     }
     
@@ -9669,6 +9681,19 @@ class ChatController: EditableViewController<ChatControllerView>, Notifable, Tab
             return takeTableItem?(msgId)
         })
         super.init(context)
+        
+        if FocusProduct.isEnabled, mode == .history {
+            let isSavedMessages: Bool
+            switch chatLocation {
+            case let .peer(peerId):
+                isSavedMessages = peerId == context.peerId
+            case let .thread(data):
+                isSavedMessages = data.peerId == context.peerId
+            }
+            if isSavedMessages {
+                bar = .init(height: 0)
+            }
+        }
     
         self.chatInteraction.update(animated: false, {$0.updatedInitialAction(initialAction)})
         context.checkFirstRecentlyForDuplicate(peerId: chatInteraction.peerId)

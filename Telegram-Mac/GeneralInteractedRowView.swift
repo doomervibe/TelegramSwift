@@ -8,6 +8,7 @@
 
 import Cocoa
 import TGUIKit
+import InAppSettings
 
 
 class GeneralInteractedRowView: GeneralContainableRowView, ViewDisplayDelegate {
@@ -270,14 +271,17 @@ class GeneralInteractedRowView: GeneralContainableRowView, ViewDisplayDelegate {
     }
     
     override var borderColor: NSColor {
+        if FocusProduct.isEnabled {
+            return theme.colors.listBackground
+        }
         guard let item = item as? GeneralInteractedRowItem else {
             return theme.colors.border
         }
         if item.disableBorder {
             return .clear
         }
-        if let theme = item.customTheme {
-            return theme.borderColor
+        if let rowTheme = item.customTheme {
+            return rowTheme.borderColor
         }
         return theme.colors.border
     }

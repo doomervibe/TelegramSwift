@@ -471,6 +471,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
         controller.view.frame = NSMakeRect(0, controller.barHeight , NSWidth(containerView.frame), NSHeight(containerView.frame) - controller.barHeight)
         
         navigationBar.switchViews(left: controller.leftBarView, center: controller.centerBarView, right: controller.rightBarView, controller: controller, style: .none, animationStyle: controller.animationStyle, liveSwiping: false)
+        syncNavigationBarHiddenState()
         
         containerView.addSubview(controller.view)
         self.view.addSubview(navigationRightBorder)
@@ -500,6 +501,11 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
         return barInset
     }
     
+    /// Subviews still layout when height is 0; hide the bar entirely (Focus zero-height titles, etc.).
+    private func syncNavigationBarHiddenState() {
+        navigationBar.isHidden = controller.barHeight <= 0
+    }
+    
     override open func swapNavigationBar(leftView: BarView?, centerView: BarView?, rightView: BarView?, animation: NavigationBarSwapAnimation) {
         
         navigationBar.frame = NSMakeRect(0, self.navigationBar.frame.minY, containerView.frame.width, controller.barHeight)
@@ -513,6 +519,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
         if let rightView = rightView {
             navigationBar.switchRightView(rightView, animation: animation)
         }
+        syncNavigationBarHiddenState()
     }
     
     var containerSize: NSSize {
@@ -560,7 +567,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
             }
 
         }
-        
+        syncNavigationBarHiddenState()
     }
     
     public func cancelCurrentController() {
@@ -729,6 +736,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
 
         let animatePosBar: Bool = controller.bar.height != previous.bar.height && style != .none
         self.navigationBar.frame = NSMakeRect(point.x, barInset, size.width, animatePosBar && controller.bar.height == 0 ? previous.bar.height : controller.bar.height)
+        syncNavigationBarHiddenState()
         
         self.navigationBar.layer?.removeAllAnimations()
 
@@ -826,11 +834,12 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
             
             
             if animatePosBar {
-                navigationBar.layer?.animatePosition(from: NSMakePoint(pfrom, barInset), to: NSMakePoint(pto, barInset), duration: previous.animationStyle.duration, timingFunction: previous.animationStyle.function, removeOnCompletion: false, completion: { [weak controller, weak navigationBar] completed in
+                navigationBar.layer?.animatePosition(from: NSMakePoint(pfrom, barInset), to: NSMakePoint(pto, barInset), duration: previous.animationStyle.duration, timingFunction: previous.animationStyle.function, removeOnCompletion: false, completion: { [weak self, weak controller, weak navigationBar] completed in
                     if let controller = controller {
                         navigationBar?.frame = NSMakeRect(0, barInset, controller.frame.width, controller.bar.height)
                     }
                     navigationBar?.layer?.removeAllAnimations()
+                    self?.syncNavigationBarHiddenState()
                 })
             }
             
@@ -859,6 +868,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
             
             navigationBar.removeFromSuperview()
             navigationBar.frame = NSMakeRect(point.x, barInset, controller.frame.width, controller.bar.height)
+            syncNavigationBarHiddenState()
 
             navigationBar.removeFromSuperview()
             containerView.addSubview(navigationBar, positioned: .below, relativeTo: self.controller.view)
@@ -951,6 +961,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
             self.navigationRightBorder.frame = NSMakeRect(self.frame.width - .borderSize, 0, .borderSize, self.frame.height)
             self.lock = false
             controller.view.restoreHierarchyDynamicContent()
+            self.viewDidResized(self.frame.size)
 
         })
 

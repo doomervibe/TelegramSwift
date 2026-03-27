@@ -11,6 +11,7 @@ import TGUIKit
 import TelegramCore
 import SwiftSignalKit
 import Postbox
+import InAppSettings
 
 
 //FB2126
@@ -191,7 +192,8 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
                 case .legacy:
                     if backingScaleFactor == 1.0 {
                         ctx.setFillColor(backdorColor.cgColor)
-                        ctx.fill(NSMakeRect(0, 0, layer.bounds.width - .borderSize, layer.bounds.height))
+                        let rightGutter: CGFloat = FocusProduct.isEnabled ? 0 : .borderSize
+                        ctx.fill(NSMakeRect(0, 0, layer.bounds.width - rightGutter, layer.bounds.height))
                     }
                     if let leftImage = item.leftImage {
                         let focus = container.focus(leftImage.backingSize)
@@ -219,7 +221,8 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
                 case .modern:
                     if backingScaleFactor == 1.0 {
                         ctx.setFillColor(backdorColor.cgColor)
-                        ctx.fill(NSMakeRect(0, 0, layer.bounds.width - .borderSize, layer.bounds.height))
+                        let rightGutter: CGFloat = FocusProduct.isEnabled ? 0 : .borderSize
+                        ctx.fill(NSMakeRect(0, 0, layer.bounds.width - rightGutter, layer.bounds.height))
                     }
                     if let leftImage = item.leftImage {
                         let focus = container.focus(leftImage.backingSize)
@@ -260,7 +263,11 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
         let customTheme = item.customTheme
         
         self.containerView.background = backdorColor
-        self.separator.backgroundColor = isRowSelected ? .clear : (customTheme?.borderColor ?? theme.colors.border)
+        if FocusProduct.isEnabled {
+            self.separator.backgroundColor = theme.colors.listBackground
+        } else {
+            self.separator.backgroundColor = isRowSelected ? .clear : (customTheme?.borderColor ?? theme.colors.border)
+        }
         self.contextLabel?.background = backdorColor
         self.containerView.set(background: backdorColor, for: .Normal)
         self.containerView.set(background: highlighted, for: .Highlight)
@@ -766,7 +773,13 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
         containerView.setCorners(item.viewType.corners, animated: animated && item.viewType != .legacy)
         
         
-        self.border = item.border
+        if FocusProduct.isEnabled {
+            var b = item.border
+            b.remove(.Right)
+            self.border = b.isEmpty ? nil : b
+        } else {
+            self.border = item.border
+        }
         
         if let badge = item.badgeNode {
             if badgeNode == nil {
@@ -1004,7 +1017,7 @@ class ShortPeerRowView: TableRowView, Notifable, ViewDisplayDelegate {
         
         
         self.image._change(opacity: item.enabled ? 1 : 0.8, animated: animated)
-        rightSeparatorView.backgroundColor = theme.colors.border
+        rightSeparatorView.backgroundColor = FocusProduct.isEnabled ? theme.colors.listBackground : theme.colors.border
         contextLabel?.backgroundColor = backdorColor
         needsLayout = true
         self.container.setNeedsDisplayLayer()
