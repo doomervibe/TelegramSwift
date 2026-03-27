@@ -76,13 +76,34 @@ struct PeerCallAction : Comparable, Identifiable {
 
 private let actionSize = NSMakeSize(50, 50)
 
-
-func makeNormalAction(_ image: NSImage) -> CGImage {
-    let img = image._cgImage!
+/// Renders catalog templates (black glyphs on clear) like stock Telegram: white icon on frosted circle,
+/// red disk + white handset for **End**.
+func makeNormalAction(_ image: NSImage, type: PeerCallActionType) -> CGImage {
+    guard let img = image._cgImage else {
+        return generateImage(actionSize, contextGenerator: { size, ctx in
+            ctx.clear(size.bounds)
+        }, scale: System.backingScale)!
+    }
     return generateImage(actionSize, contextGenerator: { size, ctx in
         ctx.clear(size.bounds)
+        ctx.interpolationQuality = .high
         ctx.round(size, size.height / 2)
-        ctx.draw(img, in: size.bounds.focus(img.systemSize))
+        switch type {
+        case .end:
+            ctx.setFillColor(NSColor.redUI.cgColor)
+            ctx.fill(size.bounds)
+        case .accept, .redial:
+            ctx.setFillColor(NSColor.greenUI.cgColor)
+            ctx.fill(size.bounds)
+        case .mute, .screencast, .video:
+            break
+        }
+        let iconRect = size.bounds.focus(img.systemSize)
+        ctx.saveGState()
+        ctx.clip(to: iconRect, mask: img)
+        ctx.setFillColor(NSColor.white.cgColor)
+        ctx.fill(iconRect)
+        ctx.restoreGState()
     }, scale: System.backingScale)!
 }
 
@@ -105,7 +126,15 @@ func makeActiveAction(_ image: NSImage) -> CGImage {
 
 func makeAction(type: PeerCallActionType, text: String, imageName: String, active: Bool = false, enabled: Bool = true, loading: Bool = false, interactive: Bool = true, attract: Bool = false, action: @escaping()->Void) -> PeerCallAction {
     let image = PrivateCallAssets.image(named: imageName)
-    return .init(stableId: type, text: text, normal: !interactive ? image._cgImage! : makeNormalAction(image), activeImage: !interactive ? nil : makeActiveAction(image), active: active, loading: loading, enabled: enabled, interactive: interactive, attract: attract, action: action)
+    let normal: CGImage
+    if interactive {
+        normal = makeNormalAction(image, type: type)
+    } else if let cg = image._cgImage {
+        normal = cg
+    } else {
+        normal = makeNormalAction(image, type: type)
+    }
+    return .init(stableId: type, text: text, normal: normal, activeImage: !interactive ? nil : makeActiveAction(image), active: active, loading: loading, enabled: enabled, interactive: interactive, attract: attract, action: action)
 }
 
 

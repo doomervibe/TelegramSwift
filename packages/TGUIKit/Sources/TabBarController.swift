@@ -35,7 +35,12 @@ private class TabBarViewController : View {
     func updateFrame(_ frame: NSRect, transition: ContainedViewLayoutTransition) {
         for subview in subviews {
             if let subview = subview as? TabBarView {
-                transition.updateFrame(view: subview, frame: NSMakeRect(0, frame.height - 50, frame.width, 50))
+                if tabView.isHidden {
+                    // Otherwise the bar still occupies 50pt and paints chrome (e.g. top border / tab backgrounds).
+                    transition.updateFrame(view: subview, frame: NSMakeRect(0, frame.height, frame.width, 0))
+                } else {
+                    transition.updateFrame(view: subview, frame: NSMakeRect(0, frame.height - 50, frame.width, 50))
+                }
             } else {
                 if tabView.isHidden {
                     transition.updateFrame(view: subview, frame: bounds)
@@ -106,7 +111,8 @@ public class TabBarController: ViewController, TabViewDelegate {
                 current.view.removeFromSuperview()
                 current.viewDidDisappear(false)
             }
-            item.controller._frameRect = NSMakeRect(0, 0, bounds.width, bounds.height - genericView.tabView.frame.height)
+            let tabInset: CGFloat = genericView.tabView.isHidden ? 0 : 50
+            item.controller._frameRect = NSMakeRect(0, 0, bounds.width, bounds.height - tabInset)
             item.controller.view.frame = item.controller._frameRect
             item.controller.viewWillAppear(false)
             view.addSubview(item.controller.view, positioned: .below, relativeTo: genericView.tabView)
@@ -126,8 +132,8 @@ public class TabBarController: ViewController, TabViewDelegate {
     
     public func hideTabView(_ hide:Bool) {
         genericView.tabView.isHidden = hide
-        current?.view.frame = hide ? bounds : NSMakeRect(0, 0, bounds.width, bounds.height - genericView.tabView.frame.height)
-        
+        genericView.needsLayout = true
+        current?.view.frame = hide ? bounds : NSMakeRect(0, 0, bounds.width, bounds.height - 50)
     }
     
     public override func updateFrame(_ frame: NSRect, transition: ContainedViewLayoutTransition) {

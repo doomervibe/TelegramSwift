@@ -168,7 +168,8 @@ private final class ApplicationContainerView: View {
     
     override func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
-        splitView.backgroundColor = theme.colors.background
+        let t = theme as! TelegramPresentationTheme
+        splitView.backgroundColor = FocusProduct.isEnabled ? t.colors.listBackground : t.colors.background
     }
     
     override func layout() {
@@ -816,6 +817,9 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
             leftController.showContactsList()
         case .search:
             leftController.showSearchList()
+            if let searchList = leftController.search.controller as? ChatListController {
+                searchList.updateCategoryUI(for: titleMap[category])
+            }
         case .stories:
             leftController.chatList.activeCategory = .stories
             leftController.showChatList()

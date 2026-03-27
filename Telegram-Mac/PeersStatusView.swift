@@ -374,7 +374,7 @@ private final class PlainStatusView : View, PeersStatusView {
         
         var controlPoint = NSMakePoint(frame.width - 10, floorToScreenPixels(backingScaleFactor, (frame.height - componentSize.height)/2.0))
         
-        let hasControls = state.splitState != .minimisize && state.mode.isPlain && state.mode == .plain
+        let hasControls = state.splitState != .minimisize && state.mode.usesFocusPeerListColumnLayout
         
         let hasProxy = (!state.proxySettings.servers.isEmpty || state.proxySettings.effectiveActiveServer != nil) && hasControls && !state.isContacts
         

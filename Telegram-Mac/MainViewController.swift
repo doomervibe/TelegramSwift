@@ -346,7 +346,12 @@ class MainViewController: TelegramViewController {
         self.bar = .init(height: 0)
         self.tabController.bar = .init(height: 0)
         
-        backgroundColor = theme.colors.background
+        if FocusProduct.isEnabled {
+            backgroundColor = theme.colors.listBackground
+            (tabController.view as? View)?.backgroundColor = theme.colors.listBackground
+        } else {
+            backgroundColor = theme.colors.background
+        }
         addSubview(self.tabController.view)
         
         if !context.isSupport, !FocusProduct.isEnabled {
@@ -576,6 +581,11 @@ class MainViewController: TelegramViewController {
         //#if !APP_STORE
         updateController.updateLocalizationAndTheme(theme: theme)
         //#endif
+        
+        if FocusProduct.isEnabled {
+            backgroundColor = theme.colors.listBackground
+            (tabController.view as? View)?.backgroundColor = theme.colors.listBackground
+        }
         
         updateTabsIfNeeded()
         self.tabController.view.needsLayout = true

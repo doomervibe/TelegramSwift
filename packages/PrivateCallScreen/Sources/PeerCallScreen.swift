@@ -57,17 +57,21 @@ public final class PeerCallScreen : ViewController {
         self.external = external
         self.isConference = isConference
         let size = isConference ? NSMakeSize(380, 600) : NSMakeSize(720, 560)
-        if let screen = NSScreen.main {
-            self.screen = Window(contentRect: NSMakeRect(floorToScreenPixels((screen.frame.width - size.width) / 2), floorToScreenPixels((screen.frame.height - size.height) / 2), size.width, size.height), styleMask: [.fullSizeContentView, .borderless, .resizable, .miniaturizable, .titled, .closable], backing: .buffered, defer: true, screen: screen)
-            self.screen.minSize = size
-            self.screen.isOpaque = true
-            self.screen.backgroundColor = .black
-            self.screen.titlebarAppearsTransparent = true
-            self.screen.isMovableByWindowBackground = true
-            self.screen.isReleasedWhenClosed = false
+        // `NSScreen.main` can be nil briefly (activation, window server edge cases). Fall back instead of trapping.
+        let targetScreen = NSScreen.main ?? NSScreen.screens.first
+        let contentRect: NSRect
+        if let s = targetScreen {
+            contentRect = NSMakeRect(floorToScreenPixels((s.frame.width - size.width) / 2), floorToScreenPixels((s.frame.height - size.height) / 2), size.width, size.height)
         } else {
-            fatalError("screen not found")
+            contentRect = NSMakeRect(100, 100, size.width, size.height)
         }
+        self.screen = Window(contentRect: contentRect, styleMask: [.fullSizeContentView, .borderless, .resizable, .miniaturizable, .titled, .closable], backing: .buffered, defer: true, screen: targetScreen)
+        self.screen.minSize = size
+        self.screen.isOpaque = true
+        self.screen.backgroundColor = .black
+        self.screen.titlebarAppearsTransparent = true
+        self.screen.isMovableByWindowBackground = true
+        self.screen.isReleasedWhenClosed = false
         super.init()
         actionsDisposable.add(audioLevelDisposable)
         self.updateAudioLevel()

@@ -20,6 +20,8 @@ private let focusPeerListContentMaxWidth: CGFloat = 600
 private let focusPeerListContentMaxHeight: CGFloat = 900
 private let focusPeerListColumnVerticalMargin: CGFloat = 8
 private let focusPeerListColumnCornerRadius: CGFloat = 12
+/// Extra padding above the search field on the dedicated Search tab (Focus fork).
+private let focusSearchTabTopInset: CGFloat = 12
 
 struct PeerListHiddenItems : Equatable {
     var archive: ItemHideStatus
@@ -1120,8 +1122,8 @@ class PeerListContainerView : Control {
         
         addSubview(backgroundView)
         addSubview(focusColumnChromeView)
-        addSubview(tableView)
-        addSubview(containerView)
+        focusColumnChromeView.addSubview(tableView)
+        focusColumnChromeView.addSubview(containerView)
         
         
         statusContainer.handleScrollEventOnInteractionEnabled = true
@@ -1275,7 +1277,7 @@ class PeerListContainerView : Control {
             controlPoint.x -= compose.frame.width
         }
         
-        let hasControls = state.splitState != .minimisize && mode.isPlain && mode == .plain
+        let hasControls = state.splitState != .minimisize && mode.usesFocusPeerListColumnLayout
         
         let hasProxy = (!state.proxySettings.servers.isEmpty || state.proxySettings.effectiveActiveServer != nil) && hasControls && !state.isContacts
         
@@ -1711,7 +1713,7 @@ class PeerListContainerView : Control {
         let contentX: CGFloat
         let columnY: CGFloat
         let columnH: CGFloat
-        if FocusProduct.isEnabled && state.splitState != .minimisize && state.mode == .plain {
+        if FocusProduct.isEnabled && state.splitState != .minimisize && state.mode.usesFocusPeerListColumnLayout {
             contentW = min(focusPeerListContentMaxWidth, size.width)
             contentX = floorToScreenPixels(backingScaleFactor, (size.width - contentW) / 2)
             columnH = min(focusPeerListContentMaxHeight, size.height - focusPeerListColumnVerticalMargin * 2)
@@ -1741,8 +1743,14 @@ class PeerListContainerView : Control {
         var inset: CGFloat = 0
         
         let containerSize = NSMakeSize(contentW, offset)
+        let useFocusColumnChrome = FocusProduct.isEnabled && state.splitState != .minimisize && state.mode.usesFocusPeerListColumnLayout
+        let chromeFrame: NSRect = useFocusColumnChrome
+            ? NSMakeRect(contentX, columnY, contentW, columnH)
+            : NSMakeRect(0, 0, size.width, size.height)
+        transition.updateFrame(view: focusColumnChromeView, frame: chromeFrame)
+        focusColumnChromeView.isHidden = false
                 
-        transition.updateFrame(view: self.containerView, frame: NSMakeRect(contentX, columnY + inset, containerSize.width, offset))
+        transition.updateFrame(view: self.containerView, frame: NSMakeRect(0, 0, containerSize.width, offset))
         self.containerView.isHidden = offset <= 0
         
         transition.updateFrame(view: self.statusContainer, frame: NSMakeRect(0, 0, containerSize.width, statusHeight))
@@ -1764,6 +1772,9 @@ class PeerListContainerView : Control {
                         
         
         var searchY: CGFloat = statusHeight
+        if FocusProduct.isEnabled, focusAlwaysShowSearch {
+            searchY += focusSearchTabTopInset
+        }
         
         if let storiesItem = storiesItem {
             searchY += (StoryListChatListRowItem.InterfaceState.revealed.height * storiesItem.progress) + 9 * storiesItem.progress
@@ -1791,7 +1802,7 @@ class PeerListContainerView : Control {
         
 
 
-        transition.updateFrame(view: tableView, frame: NSMakeRect(contentX, columnY, contentW, columnH - bottomInset))
+        transition.updateFrame(view: tableView, frame: NSMakeRect(0, 0, contentW, columnH - bottomInset))
         
         
         if let downloads = downloads {
@@ -1902,27 +1913,37 @@ class PeerListContainerView : Control {
         }
         transition.updateAlpha(view: self.backgroundView, alpha: 1 - progress)
 
-        if FocusProduct.isEnabled && state.splitState != .minimisize && state.mode == .plain {
-            let columnFrame = NSMakeRect(contentX, columnY, contentW, columnH)
-            focusColumnFrame = columnFrame
-            transition.updateFrame(view: focusColumnChromeView, frame: columnFrame)
-            focusColumnChromeView.isHidden = false
+        let allRoundedCorners: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        if useFocusColumnChrome {
+            focusColumnFrame = chromeFrame
             let listWhite = presentation.colors.background
             containerView.backgroundColor = listWhite
             focusColumnChromeView.backgroundColor = listWhite
+            focusColumnChromeView.layer?.cornerRadius = focusPeerListColumnCornerRadius
+            focusColumnChromeView.layer?.maskedCorners = allRoundedCorners
+            focusColumnChromeView.layer?.masksToBounds = true
+            containerView.layer?.cornerRadius = 0
+            containerView.layer?.maskedCorners = allRoundedCorners
+            containerView.layer?.masksToBounds = false
             tableView.getBackgroundColor = { presentation.colors.background }
             tableView.layer?.backgroundColor = presentation.colors.background.cgColor
-            tableView.wantsLayer = true
-            tableView.layer?.cornerRadius = focusPeerListColumnCornerRadius
-            tableView.layer?.masksToBounds = true
+            tableView.layer?.cornerRadius = 0
+            tableView.layer?.maskedCorners = allRoundedCorners
+            tableView.layer?.masksToBounds = false
         } else {
             focusColumnFrame = .zero
-            focusColumnChromeView.isHidden = true
-            transition.updateFrame(view: focusColumnChromeView, frame: .zero)
             containerView.backgroundColor = presentation.colors.background
+            focusColumnChromeView.backgroundColor = .clear
+            focusColumnChromeView.layer?.cornerRadius = 0
+            focusColumnChromeView.layer?.maskedCorners = allRoundedCorners
+            focusColumnChromeView.layer?.masksToBounds = false
+            containerView.layer?.cornerRadius = 0
+            containerView.layer?.maskedCorners = allRoundedCorners
+            containerView.layer?.masksToBounds = false
             tableView.getBackgroundColor = { .clear }
             tableView.layer?.backgroundColor = NSColor.clear.cgColor
             tableView.layer?.cornerRadius = 0
+            tableView.layer?.maskedCorners = allRoundedCorners
             tableView.layer?.masksToBounds = false
         }
 
@@ -1955,12 +1976,15 @@ class PeerListContainerView : Control {
         var offset: CGFloat = FocusProduct.isEnabled ? 0 : 50
         
         if state.splitState != .minimisize, state.mode.isPlain {
-            if !FocusProduct.isEnabled || state.searchState == .Focus || state.isContacts {
+            if !FocusProduct.isEnabled || state.searchState == .Focus || state.isContacts || focusAlwaysShowSearch {
                 if FocusProduct.isEnabled && state.isContacts {
                     offset += 30
                 } else {
                     offset += 40
                 }
+            }
+            if FocusProduct.isEnabled, focusAlwaysShowSearch {
+                offset += focusSearchTabTopInset
             }
             if let storiesItem = self.storiesItem {
                 offset += storiesItem.navigationHeight
@@ -1990,6 +2014,23 @@ class PeerListContainerView : Control {
 //            }
 //        }
         return height
+    }
+    
+    /// When the rounded focus column is active, search results must be a subview of `focusColumnChromeView` so `masksToBounds` clips the bottom corners. Returns frame in chrome-local coordinates, or `nil` to use `navigationController` + peer-list coordinates (stock path).
+    fileprivate func searchContainerFrameInFocusChromeIfNeeded(globalSearchRect: NSRect) -> NSRect? {
+        guard !focusColumnFrame.isEmpty else {
+            return nil
+        }
+        return NSMakeRect(
+            globalSearchRect.minX - focusColumnFrame.minX,
+            globalSearchRect.minY - focusColumnFrame.minY,
+            globalSearchRect.width,
+            globalSearchRect.height
+        )
+    }
+    
+    fileprivate func addSearchContainerBelowHeader(_ container: NSView) {
+        focusColumnChromeView.addSubview(container, positioned: .below, relativeTo: containerView)
     }
     
     func updateScrollerInset(animated: Bool) {
@@ -2067,6 +2108,19 @@ enum PeerListMode : Equatable {
             }
         }
     }
+
+    /// Focus fork: centered column + rounded list — same chrome as the main inbox.
+    var usesFocusPeerListColumnLayout: Bool {
+        switch self {
+        case .plain:
+            return true
+        case let .folder(groupId):
+            return groupId == .archive
+        default:
+            return false
+        }
+    }
+
     var groupId: EngineChatList.Group {
         switch self {
         case let .folder(groupId):
@@ -2425,11 +2479,17 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
         
         if alwaysShowSearch {
             genericView.focusAlwaysShowSearch = true
+            genericView.searchView.isDedicatedSearchMode = true
         }
         
         genericView.customHandler.size = { [weak self] size in
-            let frame = self?.genericView.searchViewRect ?? size.bounds
-            self?.searchContainer?.frame = frame
+            guard let self else { return }
+            let globalRect = self.genericView.searchViewRect
+            if let local = self.genericView.searchContainerFrameInFocusChromeIfNeeded(globalSearchRect: globalRect) {
+                self.searchContainer?.frame = local
+            } else {
+                self.searchContainer?.frame = globalRect
+            }
         }
         
         
@@ -3203,8 +3263,16 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
                 let signal = searchSection.ready.get() |> take(1)
                 _ = signal.start(next: { [weak searchSection, weak self] _ in
                     if let searchSection = searchSection, let self {
-                        let container = SearchContainer(frame: rect, searchView: searchSection.view)
+                        let chromeLocal = self.genericView.searchContainerFrameInFocusChromeIfNeeded(globalSearchRect: rect)
+                        let containerFrame = chromeLocal ?? rect
+                        let container = SearchContainer(frame: containerFrame, searchView: searchSection.view)
                         container.update(state, animated: false, arguments: self.takeArguments())
+                        if let _ = chromeLocal {
+                            self.genericView.addSearchContainerBelowHeader(container)
+                        } else {
+                            self.navigationController?.addSubview(container)
+                        }
+                        container.frame = containerFrame
                         if animated {
                             container.layer?.animateAlpha(from: 0.0, to: 1.0, duration: 0.25, completion:{ [weak self] complete in
                                 if complete {
@@ -3212,12 +3280,11 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
                                 }
                             })
                             container.layer?.animateScaleSpring(from: 1.05, to: 1.0, duration: 0.4, bounce: false)
-                            container.layer?.animatePosition(from: NSMakePoint(rect.minX, rect.minY + 15), to: rect.origin, duration: 0.4, timingFunction: .spring)
+                            container.layer?.animatePosition(from: NSMakePoint(containerFrame.minX, containerFrame.minY + 15), to: containerFrame.origin, duration: 0.4, timingFunction: .spring)
                         } else {
                             self.completeUndefiedStates(animated: false)
                             searchSection.viewDidAppear(animated)
                         }
-                        self.navigationController?.addSubview(container)
                         self.searchContainer = container
                         searchSection.didSetReady = true
                     }
@@ -3291,6 +3358,9 @@ class PeersListController: TelegramGenericViewController<PeerListContainerView>,
                 self.takeArguments()?.selectSearchTag(.chats)
                 return .invoked
             }
+        }
+        if FocusProduct.isEnabled, alwaysShowSearch {
+            return .invoked
         }
         return .rejected
     }

@@ -1247,6 +1247,29 @@ public extension CGSize {
     }
 }
 
+private func tg_emptyFallbackCGImage(scale: CGFloat) -> CGImage {
+    let s = max(scale, 1)
+    for tryScale in [s, System.backingScale, CGFloat(1)] where tryScale > 0 {
+        let dc = DrawingContext(size: NSSize(width: 1, height: 1), scale: tryScale, clear: true)
+        if let img = dc.generateImage() {
+            return img
+        }
+    }
+    var pixel: UInt32 = 0
+    let rgb = CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+    let ctx = CGContext(
+        data: &pixel,
+        width: 1,
+        height: 1,
+        bitsPerComponent: 8,
+        bytesPerRow: 4,
+        space: rgb,
+        bitmapInfo: bitmapInfo
+    )!
+    return ctx.makeImage()!
+}
+
 public extension NSImage {
     
     func precomposed(_ colors:[NSColor], flipVertical:Bool = false, flipHorizontal:Bool = false, scale: CGFloat = System.backingScale) -> CGImage {
@@ -1267,12 +1290,14 @@ public extension NSImage {
             let cimage = image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil)
             
             if !colors.isEmpty {
-                ctx.clip(to: rect, mask: cimage!)
+                if let cimage = cimage {
+                    ctx.clip(to: rect, mask: cimage)
+                }
                 if colors.count > 2 {
                     let preview = AnimatedGradientBackgroundView.generatePreview(size: NSMakeSize(32, 32), colors: colors)
                     ctx.draw(preview, in: rect.focus(preview.size.aspectFilled(rect.size)))
                 } else if colors.count > 1 {
-                    let rect = NSMakeRect(0, 0, rect.width, rect.height)
+                    let gRect = NSMakeRect(0, 0, rect.width, rect.height)
                     let gradientColors = colors.reversed().map { $0.cgColor } as CFArray
                     let delta: CGFloat = 1.0 / (CGFloat(colors.count) - 1.0)
                     
@@ -1281,14 +1306,18 @@ public extension NSImage {
                         locations.append(delta * CGFloat(i))
                     }
                     let colorSpace = CGColorSpaceCreateDeviceRGB()
-                    let gradient = CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: &locations)!
-                    ctx.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: 0.0, y: rect.height), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                    if let gradient = CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: &locations) {
+                        ctx.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: 0.0, y: gRect.height), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                    } else if let color = colors.first {
+                        ctx.setFillColor(color.cgColor)
+                        ctx.fill(gRect)
+                    }
                 } else if let color = colors.first {
                     ctx.setFillColor(color.cgColor)
                     ctx.fill(rect)
                 }
-            } else {
-                ctx.draw(cimage!, in: imageRect)
+            } else if let cimage = cimage {
+                ctx.draw(cimage, in: imageRect)
             }
             
 
@@ -1296,32 +1325,36 @@ public extension NSImage {
         
         drawContext.withFlippedContext(horizontal: flipHorizontal, vertical: flipVertical, make)
 
-        return drawContext.generateImage()!
+        return drawContext.generateImage() ?? tg_emptyFallbackCGImage(scale: scale)
     }
     
     
     func precomposed(_ color:NSColor? = nil, bottomColor: NSColor? = nil, flipVertical:Bool = false, flipHorizontal:Bool = false, scale: CGFloat = System.backingScale, zoom: CGFloat = 1) -> CGImage {
         
-        let drawContext:DrawingContext = DrawingContext(size: NSMakeSize(size.width * zoom, size.height * zoom), scale: scale, clear: true)
+        let z = (zoom.isFinite && zoom > 0) ? zoom : 1
+        let drawContext:DrawingContext = DrawingContext(size: NSMakeSize(size.width * z, size.height * z), scale: scale, clear: true)
         
         
         let make:(CGContext) -> Void = { [weak self] ctx in
             
             guard let image = self else { return }
             
-            let rect = NSMakeRect(0, 0, drawContext.size.width * zoom, drawContext.size.height * zoom)
+            let rect = NSMakeRect(0, 0, drawContext.size.width * z, drawContext.size.height * z)
+            guard rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else { return }
             ctx.interpolationQuality = .high
             ctx.clear(rect)
             
-            var imageRect:CGRect = NSMakeRect(0, 0, image.size.width * zoom, image.size.height * zoom)
+            var imageRect:CGRect = NSMakeRect(0, 0, image.size.width * z, image.size.height * z)
 
             let cimage = image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil)
             
             if let color = color {
-                ctx.clip(to: rect, mask: cimage!)
+                if let cimage = cimage {
+                    ctx.clip(to: rect, mask: cimage)
+                }
                 if let bottomColor = bottomColor {
                     let colors = [color, bottomColor]
-                    let rect = NSMakeRect(0, 0, rect.width, rect.height)
+                    let gRect = NSMakeRect(0, 0, rect.width, rect.height)
                     let gradientColors = colors.reversed().map { $0.cgColor } as CFArray
                     let delta: CGFloat = 1.0 / (CGFloat(colors.count) - 1.0)
                     
@@ -1330,22 +1363,26 @@ public extension NSImage {
                         locations.append(delta * CGFloat(i))
                     }
                     let colorSpace = CGColorSpaceCreateDeviceRGB()
-                    let gradient = CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: &locations)!
-                    ctx.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: 0.0, y: rect.height), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                    if let gradient = CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: &locations) {
+                        ctx.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: 0.0, y: gRect.height), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                    } else {
+                        ctx.setFillColor(color.cgColor)
+                        ctx.fill(gRect)
+                    }
                 } else {
                     ctx.setFillColor(color.cgColor)
                     ctx.fill(rect)
                 }
              
-            } else {
-                ctx.draw(cimage!, in: imageRect)
+            } else if let cimage = cimage {
+                ctx.draw(cimage, in: imageRect)
             }
 
         }
         
         drawContext.withFlippedContext(horizontal: flipHorizontal, vertical: flipVertical, make)
 
-        return drawContext.generateImage()!
+        return drawContext.generateImage() ?? tg_emptyFallbackCGImage(scale: scale)
     }
     
 }
@@ -2838,7 +2875,22 @@ public extension NSCursor  {
 
 public extension NSImage {
     var _cgImage: CGImage? {
-        return self.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        if let cg = cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            return cg
+        }
+        var proposed = CGRect(origin: .zero, size: size)
+        if proposed.width <= 0 || proposed.height <= 0 || !proposed.width.isFinite || !proposed.height.isFinite {
+            proposed.size = NSSize(width: max(1, size.width), height: max(1, size.height))
+        }
+        if let cg = cgImage(forProposedRect: &proposed, context: nil, hints: nil) {
+            return cg
+        }
+        for rep in representations {
+            if let bmp = rep as? NSBitmapImageRep {
+                return bmp.cgImage
+            }
+        }
+        return nil
     }
     
     var jpegCGImage: CGImage? {

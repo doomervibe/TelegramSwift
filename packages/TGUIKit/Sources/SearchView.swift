@@ -98,6 +98,9 @@ public final class CustomSearchController {
 
 open class SearchView: OverlayControl, NSTextViewDelegate {
     
+    /// When true (standalone Search tab), Esc does not collapse the field to `.None` or clear the surface — avoids feeling like "back" to another list.
+    public var isDedicatedSearchMode: Bool = false
+    
     public private(set) var state:SearchFieldState = .None
     
     private var tagsInfo: [TagInfo] = []
@@ -419,7 +422,7 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
             if !tags.isEmpty {
                 customSearchControl?.deleteTag(tags.count - 1)
                 self.needsLayout = true
-            } else {
+            } else if !isDedicatedSearchMode {
                 self.change(state: .None, true)
             }
         } else {
@@ -527,7 +530,7 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
         let value = SearchState(state: state, request: self.query, responder: false)
         searchInteractions?.responderModified(value)
         _searchValue.set(value)
-        if isEmpty && tags.isEmpty {
+        if isEmpty && tags.isEmpty, !isDedicatedSearchMode {
             change(state: .None, true)
         }
         
@@ -543,12 +546,17 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
         change(state: .Focus, true)
 
         self._window?.set(escape: { [weak self] _ -> KeyHandlerResult in
-            if let strongSelf = self {
-                strongSelf.setString("")
-                return strongSelf.changeResponder() ? .invoked : .rejected
+            guard let strongSelf = self else {
+                return .rejected
             }
-            return .rejected
-            
+            if strongSelf.isDedicatedSearchMode {
+                if !strongSelf.query.isEmpty {
+                    strongSelf.setString("")
+                }
+                return .invoked
+            }
+            strongSelf.setString("")
+            return strongSelf.changeResponder() ? .invoked : .rejected
         }, with: self, priority: .modal)
         
         self._window?.set(handler: { [weak self] _ -> KeyHandlerResult in
