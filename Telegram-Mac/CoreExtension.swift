@@ -230,6 +230,19 @@ extension TelegramMediaFile {
         return true
     }
     
+    /// Video message / «кружок». Должно совпадать с разметкой Postbox (тег voiceOrInstantVideo), иначе галерея запрашивает неверную ленту.
+    var isTelegramRoundVideo: Bool {
+        if isInstantVideo {
+            return true
+        }
+        for attr in attributes {
+            if case let .Video(_, _, flags, _, _, _) = attr, flags.contains(.instantRoundVideo) {
+                return true
+            }
+        }
+        return false
+    }
+    
 //    var streaming: MediaPlayerStreaming {
 //        for attr in attributes {
 //            if case let .Video(_, _, flags) = attr {

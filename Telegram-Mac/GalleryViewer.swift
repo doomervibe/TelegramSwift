@@ -59,6 +59,9 @@ private func tagsForMessage(_ message: Message) -> MessageTags? {
         case let file as TelegramMediaFile:
             if file.isVideo && file.isAnimated {
                 return nil
+            } else if file.isTelegramRoundVideo {
+                // Postbox tags round videos as .voiceOrInstantVideo (instantRoundVideo), not .photoOrVideo.
+                return .voiceOrInstantVideo
             } else if file.isVideo && !file.isAnimated {
                 return .photoOrVideo
             } else if file.isVoice {
@@ -108,7 +111,7 @@ private func mediaForMessage(message: Message, postbox: Postbox) -> Media? {
         if let media = media as? TelegramMediaImage {
             return media
         } else if let file = media as? TelegramMediaFile {
-            if file.isGraphicFile || file.isVideo || file.isAnimated {
+            if file.isGraphicFile || file.isVideo || file.isAnimated || file.isTelegramRoundVideo {
                 return file
             } else if file.isVideoFile, FileManager.default.fileExists(atPath: postbox.mediaBox.resourcePath(file.resource)) {
                 return file
@@ -134,13 +137,13 @@ fileprivate func itemFor(entry: ChatHistoryEntry, context: AccountContext, pager
             if let _ = media as? TelegramMediaImage {
                 return MGalleryPhotoItem(context, .message(entry), pagerSize)
             } else if let file = media as? TelegramMediaFile {
-                if (file.isVideo && !file.isAnimated) {
+                if file.isVideo && file.isAnimated {
+                    return MGalleryGIFItem(context, .message(entry), pagerSize)
+                } else if file.isTelegramRoundVideo || (file.isVideo && !file.isAnimated) {
                     return MGalleryVideoItem(context, .message(entry), pagerSize)
                 } else {
                     if file.mimeType.hasPrefix("image/") {
                         return MGalleryPhotoItem(context, .message(entry), pagerSize)
-                    } else if file.isVideo && file.isAnimated {
-                        return MGalleryGIFItem(context, .message(entry), pagerSize)
                     } else if file.isVideoFile {
                         return MGalleryVideoItem(context, .message(entry), pagerSize)
                     }
@@ -537,7 +540,7 @@ class GalleryViewer: NSResponder {
                 } else if let file = media.media as? TelegramMediaFile {
                     if file.isVideo && file.isAnimated {
                         inserted.append((media.index, MGalleryGIFItem(context, .instantMedia(media, parent), pagerSize)))
-                    } else if file.isVideo {
+                    } else if file.isVideo || file.isTelegramRoundVideo {
                         inserted.append((media.index, MGalleryVideoItem(context, .instantMedia(media, parent), pagerSize)))
                     }
                 } else if media.media is TelegramMediaWebpage {
@@ -579,7 +582,7 @@ class GalleryViewer: NSResponder {
                 } else if let file = media as? TelegramMediaFile {
                     if file.isVideo && file.isAnimated {
                         inserted.append((i, MGalleryGIFItem(context, .media(media, i, parent), pagerSize)))
-                    } else if file.isVideo {
+                    } else if file.isVideo || file.isTelegramRoundVideo {
                         inserted.append((i, MGalleryVideoItem(context, .media(media, i, parent), pagerSize)))
                     }
                 }
@@ -731,7 +734,7 @@ class GalleryViewer: NSResponder {
                                         } else if let file = media.media as? TelegramMediaFile {
                                             if file.isVideo && file.isAnimated {
                                                 inserted.append((i, MGalleryGIFItem(context, .instantMedia(media, message), pagerSize)))
-                                            } else if file.isVideo || file.isVideoFile {
+                                            } else if file.isVideo || file.isTelegramRoundVideo || file.isVideoFile {
                                                 inserted.append((i, MGalleryVideoItem(context, .instantMedia(media, message), pagerSize)))
                                             }
                                         } else if media.media is TelegramMediaWebpage {

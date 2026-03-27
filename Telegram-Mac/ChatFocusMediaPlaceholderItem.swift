@@ -76,7 +76,7 @@ final class ChatFocusMediaPlaceholderView: ChatRowView {
                 if media is TelegramMediaImage {
                     return media
                 } else if let file = media as? TelegramMediaFile {
-                    if file.isGraphicFile || file.isVideo || file.isAnimated || file.isVideoFile {
+                    if file.isGraphicFile || file.isVideo || file.isAnimated || file.isVideoFile || file.isTelegramRoundVideo {
                         return file
                     }
                 }
