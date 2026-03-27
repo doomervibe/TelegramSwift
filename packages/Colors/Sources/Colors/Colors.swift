@@ -5,25 +5,27 @@ import Strings
 
 public extension NSColor {
     static func average(of colors: [NSColor]) -> NSColor {
-           var sr: CGFloat = 0.0
-           var sg: CGFloat = 0.0
-           var sb: CGFloat = 0.0
-           var sa: CGFloat = 0.0
-
-           for color in colors {
-               var r: CGFloat = 0.0
-               var g: CGFloat = 0.0
-               var b: CGFloat = 0.0
-               var a: CGFloat = 0.0
-               color.getRed(&r, green: &g, blue: &b, alpha: &a)
-               sr += r
-               sg += g
-               sb += b
-               sa += a
-           }
-
-           return NSColor(red: sr / CGFloat(colors.count), green: sg / CGFloat(colors.count), blue: sb / CGFloat(colors.count), alpha: sa / CGFloat(colors.count))
-       }
+        guard !colors.isEmpty else {
+            return NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
+        }
+        var sr: CGFloat = 0
+        var sg: CGFloat = 0
+        var sb: CGFloat = 0
+        var sa: CGFloat = 0
+        var n: CGFloat = 0
+        for color in colors {
+            guard let (r, g, b) = color.rgbTripletForColorMath() else { continue }
+            sr += r
+            sg += g
+            sb += b
+            sa += color.alpha
+            n += 1
+        }
+        guard n > 0 else {
+            return NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
+        }
+        return NSColor(srgbRed: sr / n, green: sg / n, blue: sb / n, alpha: sa / n)
+    }
 
     
     convenience init?(hexString: String) {
@@ -64,25 +66,15 @@ public extension NSColor {
     }
     
     var hexString: String {
-        // Get the red, green, and blue components of the color
-        var r :CGFloat = 0
-        var g: CGFloat = 0
-        var b: CGFloat = 0
-        var a: CGFloat = 0
+        guard let (r, g, b) = rgbTripletForColorMath() else {
+            return "#000000"
+        }
+        let a = alpha
         
-        
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)!
-
-        
-        var rInt, gInt, bInt, aInt: Int
+        var rInt, gInt, bInt: Int
         var rHex, gHex, bHex: String
         
         var hexColor: String
-        
-        color.getRed(&r, green: &g, blue: &b, alpha: &a)
-        
-        // println("R: \(r) G: \(g) B:\(b) A:\(a)")
         
         // Convert the components to numbers (unsigned decimal integer) between 0 and 255
         rInt = Int(round(r * 255.0))
@@ -117,25 +109,14 @@ public extension NSColor {
     }
     
     var rgbHexString: String {
-        // Get the red, green, and blue components of the color
-        var r :CGFloat = 0
-        var g: CGFloat = 0
-        var b: CGFloat = 0
-        var a: CGFloat = 0
+        guard let (r, g, b) = rgbTripletForColorMath() else {
+            return "#000000"
+        }
         
-        
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)!
-
-        
-        var rInt, gInt, bInt, aInt: Int
+        var rInt, gInt, bInt: Int
         var rHex, gHex, bHex: String
         
         var hexColor: String
-        
-        color.getRed(&r, green: &g, blue: &b, alpha: &a)
-        
-        // println("R: \(r) G: \(g) B:\(b) A:\(a)")
         
         // Convert the components to numbers (unsigned decimal integer) between 0 and 255
         rInt = Int(round(r * 255.0))
@@ -218,19 +199,13 @@ public extension NSColor {
     }
 
     var lightness: CGFloat {
-        var red: CGFloat = 0.0
-        var green: CGFloat = 0.0
-        var blue: CGFloat = 0.0
-        self.getRed(&red, green: &green, blue: &blue, alpha: nil)
-        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        guard let (r, g, b) = rgbTripletForColorMath() else { return 0 }
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
     
+    /// Same components as `hsv` (AppKit HSB == HSV); avoids `getHue`.
     var hsb: (CGFloat, CGFloat, CGFloat) {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var brightness: CGFloat = 0.0
-        self.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
-        return (hue, saturation, brightness)
+        return hsv
     }
 
     
@@ -248,44 +223,37 @@ public extension NSColor {
     }
     
     func withMultipliedBrightnessBy(_ factor: CGFloat) -> NSColor {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var brightness: CGFloat = 0.0
-        var alpha: CGFloat = 0.0
-        self.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        return NSColor(hue: hue, saturation: saturation, brightness: max(0.0, min(1.0, brightness * factor)), alpha: alpha)
+        let (h, s, v) = hsv
+        let a = alpha
+        let newV = max(0.0, min(1.0, v * factor))
+        let (r, g, b) = Self.rgbFromHSVTriplet(h, s, newV)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
     
     func withMultiplied(hue: CGFloat, saturation: CGFloat, brightness: CGFloat) -> NSColor {
-        var hueValue: CGFloat = 0.0
-        var saturationValue: CGFloat = 0.0
-        var brightnessValue: CGFloat = 0.0
-        var alphaValue: CGFloat = 0.0
-        self.getHue(&hueValue, saturation: &saturationValue, brightness: &brightnessValue, alpha: &alphaValue)
-        
-        return NSColor(hue: max(0.0, min(1.0, hueValue * hue)), saturation: max(0.0, min(1.0, saturationValue * saturation)), brightness: max(0.0, min(1.0, brightnessValue * brightness)), alpha: alphaValue)
+        let (h0, s0, v0) = hsv
+        let a = alpha
+        let h2 = max(0.0, min(1.0, h0 * hue))
+        let s2 = max(0.0, min(1.0, s0 * saturation))
+        let v2 = max(0.0, min(1.0, v0 * brightness))
+        let (r, g, b) = Self.rgbFromHSVTriplet(h2, s2, v2)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
 
     func interpolateTo(_ color: NSColor, fraction: CGFloat) -> NSColor? {
-           let f = min(max(0, fraction), 1)
-
-           var r1: CGFloat = 0.0
-           var r2: CGFloat = 0.0
-           var g1: CGFloat = 0.0
-           var g2: CGFloat = 0.0
-           var b1: CGFloat = 0.0
-           var b2: CGFloat = 0.0
-           var a1: CGFloat = 0.0
-           var a2: CGFloat = 0.0
-           self.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-           color.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-           let r: CGFloat = CGFloat(r1 + (r2 - r1) * f)
-           let g: CGFloat = CGFloat(g1 + (g2 - g1) * f)
-           let b: CGFloat = CGFloat(b1 + (b2 - b1) * f)
-           let a: CGFloat = CGFloat(a1 + (a2 - a1) * f)
-           return NSColor(red: r, green: g, blue: b, alpha: a)
-       }
+        let f = min(max(0, fraction), 1)
+        guard let (r1, g1, b1) = rgbTripletForColorMath(),
+              let (r2, g2, b2) = color.rgbTripletForColorMath() else {
+            return self
+        }
+        let a1 = alpha
+        let a2 = color.alpha
+        let r = r1 + (r2 - r1) * f
+        let g = g1 + (g2 - g1) * f
+        let b = b1 + (b2 - b1) * f
+        let a = a1 + (a2 - a1) * f
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
 
 
     
@@ -348,17 +316,11 @@ public extension NSColor {
     }
     
     private func hueColorWithBrightnessAmount(_ amount: CGFloat) -> NSColor {
-        var hue         : CGFloat = 0
-        var saturation  : CGFloat = 0
-        var brightness  : CGFloat = 0
-        var alpha       : CGFloat = 0
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)!
-        color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        return NSColor( hue: hue,
-                        saturation: saturation,
-                        brightness: brightness * amount,
-                        alpha: alpha )
+        let (h, s, v) = hsv
+        let a = alpha
+        let newV = max(0.0, min(1.0, v * amount))
+        let (r, g, b) = Self.rgbFromHSVTriplet(h, s, newV)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
     
     
@@ -449,28 +411,18 @@ public extension NSColor {
     }
     
     var argb: UInt32 {
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)!
-        var red: CGFloat = 0.0
-        var green: CGFloat = 0.0
-        var blue: CGFloat = 0.0
-        var alpha: CGFloat = 0.0
-        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
-        return (UInt32(alpha * 255.0) << 24) | (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
+        guard let (red, green, blue) = rgbTripletForColorMath() else {
+            return 0xFF000000
+        }
+        let opa = self.alpha
+        return (UInt32(opa * 255.0) << 24) | (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
     }
     
     var rgb: UInt32 {
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)
-        if let color = color {
-            let red: CGFloat = color.redComponent
-            let green: CGFloat = color.greenComponent
-            let blue: CGFloat = color.blueComponent
-            
-            return (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
+        guard let (red, green, blue) = rgbTripletForColorMath() else {
+            return 0x000000
         }
-        return 0x000000
+        return (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
     }
     
     var underTextColor: NSColor {
@@ -515,6 +467,34 @@ fileprivate extension NSColor {
             h = ((r - g) / delta + 4) / 6
         }
         return (h, s, v)
+    }
+
+    /// Inverse of `hsvFromRGBTriplet`; `h` in 0…1, s/v in 0…1 — sRGB linear components in 0…1.
+    static func rgbFromHSVTriplet(_ h: CGFloat, _ s: CGFloat, _ v: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
+        let vv = max(0, min(1, v))
+        let ss = max(0, min(1, s))
+        if ss <= 0 {
+            return (vv, vv, vv)
+        }
+        var hh = h.truncatingRemainder(dividingBy: 1)
+        if hh < 0 { hh += 1 }
+        hh *= 6
+        let i = floor(hh)
+        let f = hh - i
+        let p = vv * (1 - ss)
+        let q = vv * (1 - f * ss)
+        let t = vv * (1 - (1 - f) * ss)
+        let pp = max(0, min(1, p))
+        let qq = max(0, min(1, q))
+        let tt = max(0, min(1, t))
+        switch Int(i) % 6 {
+        case 0: return (vv, tt, pp)
+        case 1: return (qq, vv, pp)
+        case 2: return (pp, vv, tt)
+        case 3: return (pp, qq, vv)
+        case 4: return (tt, pp, vv)
+        default: return (vv, pp, qq)
+        }
     }
 }
 

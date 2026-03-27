@@ -119,6 +119,71 @@ public class DashLayer : SimpleLayer {
     }
 }
 
+// Mirrors packages/Colors safe RGB→HSV math — avoids getHue/getRed ObjC exceptions on some macOS versions.
+fileprivate extension NSColor {
+    func rgbTripletForColorMath() -> (CGFloat, CGFloat, CGFloat)? {
+        guard let srgb = usingColorSpace(.sRGB) ?? usingColorSpace(.displayP3) ?? usingColorSpace(.deviceRGB) else {
+            return nil
+        }
+        let cg = srgb.cgColor
+        guard let comps = cg.components, !comps.isEmpty else { return nil }
+        let n = cg.numberOfComponents
+        if n >= 3 {
+            return (comps[0], comps[1], comps[2])
+        }
+        let w = comps[0]
+        return (w, w, w)
+    }
+
+    static func hsvFromRGBTriplet(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
+        let maxV = max(max(r, g), b)
+        let minV = min(min(r, g), b)
+        let delta = maxV - minV
+        let v = maxV
+        let s = maxV > 0 ? delta / maxV : 0
+        let h: CGFloat
+        if delta == 0 {
+            h = 0
+        } else if maxV == r {
+            var hh = (g - b) / delta
+            hh = hh.truncatingRemainder(dividingBy: 6)
+            if hh < 0 { hh += 6 }
+            h = hh / 6
+        } else if maxV == g {
+            h = ((b - r) / delta + 2) / 6
+        } else {
+            h = ((r - g) / delta + 4) / 6
+        }
+        return (h, s, v)
+    }
+
+    static func rgbFromHSVTriplet(_ h: CGFloat, _ s: CGFloat, _ v: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
+        let vv = max(0, min(1, v))
+        let ss = max(0, min(1, s))
+        if ss <= 0 {
+            return (vv, vv, vv)
+        }
+        var hh = h.truncatingRemainder(dividingBy: 1)
+        if hh < 0 { hh += 1 }
+        hh *= 6
+        let i = floor(hh)
+        let f = hh - i
+        let p = vv * (1 - ss)
+        let q = vv * (1 - f * ss)
+        let t = vv * (1 - (1 - f) * ss)
+        let pp = max(0, min(1, p))
+        let qq = max(0, min(1, q))
+        let tt = max(0, min(1, t))
+        switch Int(i) % 6 {
+        case 0: return (vv, tt, pp)
+        case 1: return (qq, vv, pp)
+        case 2: return (pp, vv, tt)
+        case 3: return (pp, qq, vv)
+        case 4: return (tt, pp, vv)
+        default: return (vv, pp, qq)
+        }
+    }
+}
 
 public extension NSColor {
     
@@ -139,41 +204,42 @@ public extension NSColor {
     }
     
     var alpha: CGFloat {
-        var alpha: CGFloat = 0
-        self.getHue(nil, saturation: nil, brightness: nil, alpha: &alpha)
-        return alpha
+        if let c = usingColorSpace(.sRGB) ?? usingColorSpace(.deviceRGB) {
+            return c.alphaComponent
+        }
+        let n = cgColor.numberOfComponents
+        if let comps = cgColor.components, n >= 1 {
+            return comps[n - 1]
+        }
+        return 1
     }
     
     var hsv: (CGFloat, CGFloat, CGFloat) {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var value: CGFloat = 0.0
-        self.getHue(&hue, saturation: &saturation, brightness: &value, alpha: nil)
-        return (hue, saturation, value)
+        guard let (r, g, b) = rgbTripletForColorMath() else {
+            return (0, 0, 0)
+        }
+        return Self.hsvFromRGBTriplet(r, g, b)
     }
     
     func isTooCloseHSV(to color: NSColor) -> Bool {
-        let hsv1 = abs(self.hsv.0) + abs(self.hsv.1) + abs(self.hsv.2)
-        let hsv2 = abs(color.hsv.0) + abs(color.hsv.1) + abs(color.hsv.2)
-
-        let dif = abs(hsv1 - hsv2)
-        return dif < 0.005
+        guard let (r1, g1, b1) = rgbTripletForColorMath(),
+              let (r2, g2, b2) = color.rgbTripletForColorMath() else {
+            return false
+        }
+        let hsv1 = Self.hsvFromRGBTriplet(r1, g1, b1)
+        let hsv2 = Self.hsvFromRGBTriplet(r2, g2, b2)
+        let sum1 = abs(hsv1.0) + abs(hsv1.1) + abs(hsv1.2)
+        let sum2 = abs(hsv2.0) + abs(hsv2.1) + abs(hsv2.2)
+        return abs(sum1 - sum2) < 0.005
     }
 
     var lightness: CGFloat {
-        var red: CGFloat = 0.0
-        var green: CGFloat = 0.0
-        var blue: CGFloat = 0.0
-        self.getRed(&red, green: &green, blue: &blue, alpha: nil)
-        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        guard let (r, g, b) = rgbTripletForColorMath() else { return 0 }
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
     
     var hsb: (CGFloat, CGFloat, CGFloat) {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var brightness: CGFloat = 0.0
-        self.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
-        return (hue, saturation, brightness)
+        return hsv
     }
 
     
@@ -191,81 +257,64 @@ public extension NSColor {
     }
     
     func withMultipliedBrightnessBy(_ factor: CGFloat) -> NSColor {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var brightness: CGFloat = 0.0
-        var alpha: CGFloat = 0.0
-        self.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        return NSColor(hue: hue, saturation: saturation, brightness: max(0.0, min(1.0, brightness * factor)), alpha: alpha)
+        let (h, s, v) = hsv
+        let a = alpha
+        let newV = max(0.0, min(1.0, v * factor))
+        let (r, g, b) = Self.rgbFromHSVTriplet(h, s, newV)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
     
     func withMultiplied(hue: CGFloat, saturation: CGFloat, brightness: CGFloat) -> NSColor {
-        var hueValue: CGFloat = 0.0
-        var saturationValue: CGFloat = 0.0
-        var brightnessValue: CGFloat = 0.0
-        var alphaValue: CGFloat = 0.0
-        self.getHue(&hueValue, saturation: &saturationValue, brightness: &brightnessValue, alpha: &alphaValue)
-        
-        return NSColor(hue: max(0.0, min(1.0, hueValue * hue)), saturation: max(0.0, min(1.0, saturationValue * saturation)), brightness: max(0.0, min(1.0, brightnessValue * brightness)), alpha: alphaValue)
+        let (h0, s0, v0) = hsv
+        let a = alpha
+        let h2 = max(0.0, min(1.0, h0 * hue))
+        let s2 = max(0.0, min(1.0, s0 * saturation))
+        let v2 = max(0.0, min(1.0, v0 * brightness))
+        let (r, g, b) = Self.rgbFromHSVTriplet(h2, s2, v2)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
     
     func withMultipliedAlpha(_ alpha: CGFloat) -> NSColor {
-        var r1: CGFloat = 0.0
-        var g1: CGFloat = 0.0
-        var b1: CGFloat = 0.0
-        var a1: CGFloat = 0.0
-        self.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        return NSColor(red: r1, green: g1, blue: b1, alpha: max(0.0, min(1.0, a1 * alpha)))
+        guard let (r, g, b) = rgbTripletForColorMath() else {
+            return withAlphaComponent(max(0.0, min(1.0, self.alpha * alpha)))
+        }
+        let a1 = self.alpha
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: max(0.0, min(1.0, a1 * alpha)))
     }
     
     func mixedWith(_ other: NSColor, alpha: CGFloat) -> NSColor {
-        
-            if let blended = self.blended(withFraction: alpha, of: other) {
-                return blended
-            }
-        
-            let alpha = min(1.0, max(0.0, alpha))
-            let oneMinusAlpha = 1.0 - alpha
-            
-            var r1: CGFloat = 0.0
-            var r2: CGFloat = 0.0
-            var g1: CGFloat = 0.0
-            var g2: CGFloat = 0.0
-            var b1: CGFloat = 0.0
-            var b2: CGFloat = 0.0
-            var a1: CGFloat = 0.0
-            var a2: CGFloat = 0.0
-            self.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-            other.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-            let r = r1 * oneMinusAlpha + r2 * alpha
-            let g = g1 * oneMinusAlpha + g2 * alpha
-            let b = b1 * oneMinusAlpha + b2 * alpha
-            let a = a1 * oneMinusAlpha + a2 * alpha
-            return NSColor(red: r, green: g, blue: b, alpha: a)
+        if let blended = self.blended(withFraction: alpha, of: other) {
+            return blended
         }
-
-
+        let mix = min(1.0, max(0.0, alpha))
+        let oneMinus = 1.0 - mix
+        guard let (r1, g1, b1) = rgbTripletForColorMath(),
+              let (r2, g2, b2) = other.rgbTripletForColorMath() else {
+            return self
+        }
+        let a1 = self.alpha
+        let a2 = other.alpha
+        let r = r1 * oneMinus + r2 * mix
+        let g = g1 * oneMinus + g2 * mix
+        let b = b1 * oneMinus + b2 * mix
+        let a = a1 * oneMinus + a2 * mix
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
 
     func interpolateTo(_ color: NSColor, fraction: CGFloat) -> NSColor? {
-           let f = min(max(0, fraction), 1)
-
-           var r1: CGFloat = 0.0
-           var r2: CGFloat = 0.0
-           var g1: CGFloat = 0.0
-           var g2: CGFloat = 0.0
-           var b1: CGFloat = 0.0
-           var b2: CGFloat = 0.0
-           var a1: CGFloat = 0.0
-           var a2: CGFloat = 0.0
-           self.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-           color.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-           let r: CGFloat = CGFloat(r1 + (r2 - r1) * f)
-           let g: CGFloat = CGFloat(g1 + (g2 - g1) * f)
-           let b: CGFloat = CGFloat(b1 + (b2 - b1) * f)
-           let a: CGFloat = CGFloat(a1 + (a2 - a1) * f)
-           return NSColor(red: r, green: g, blue: b, alpha: a)
-       }
+        let f = min(max(0, fraction), 1)
+        guard let (r1, g1, b1) = rgbTripletForColorMath(),
+              let (r2, g2, b2) = color.rgbTripletForColorMath() else {
+            return self
+        }
+        let a1 = alpha
+        let a2 = color.alpha
+        let r = r1 + (r2 - r1) * f
+        let g = g1 + (g2 - g1) * f
+        let b = b1 + (b2 - b1) * f
+        let a = a1 + (a2 - a1) * f
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
 
 
     
@@ -328,17 +377,11 @@ public extension NSColor {
     }
     
     private func hueColorWithBrightnessAmount(_ amount: CGFloat) -> NSColor {
-        var hue         : CGFloat = 0
-        var saturation  : CGFloat = 0
-        var brightness  : CGFloat = 0
-        var alpha       : CGFloat = 0
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)!
-        color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        return NSColor( hue: hue,
-                        saturation: saturation,
-                        brightness: brightness * amount,
-                        alpha: alpha )
+        let (h, s, v) = hsv
+        let a = alpha
+        let newV = max(0.0, min(1.0, v * amount))
+        let (r, g, b) = Self.rgbFromHSVTriplet(h, s, newV)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
     
     
@@ -429,28 +472,18 @@ public extension NSColor {
     }
     
     var argb: UInt32 {
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)!
-        var red: CGFloat = 0.0
-        var green: CGFloat = 0.0
-        var blue: CGFloat = 0.0
-        var alpha: CGFloat = 0.0
-        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
-        return (UInt32(alpha * 255.0) << 24) | (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
+        guard let (red, green, blue) = rgbTripletForColorMath() else {
+            return 0xFF000000
+        }
+        let opa = self.alpha
+        return (UInt32(opa * 255.0) << 24) | (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
     }
     
     var rgb: UInt32 {
-        
-        let color = self.usingColorSpaceName(NSColorSpaceName.deviceRGB)
-        if let color = color {
-            let red: CGFloat = color.redComponent
-            let green: CGFloat = color.greenComponent
-            let blue: CGFloat = color.blueComponent
-            
-            return (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
+        guard let (red, green, blue) = rgbTripletForColorMath() else {
+            return 0x000000
         }
-        return 0x000000
+        return (UInt32(red * 255.0) << 16) | (UInt32(green * 255.0) << 8) | (UInt32(blue * 255.0))
     }
 }
 

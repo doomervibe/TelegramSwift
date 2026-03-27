@@ -3492,69 +3492,62 @@ func generateTheme(palette: ColorPalette, cloudTheme: TelegramTheme?, bubbled: B
     return TelegramPresentationTheme(colors: effectivePalette, cloudTheme: cloudTheme, search: SearchTheme(effectivePalette.grayBackground, #imageLiteral(resourceName: "Icon_SearchField").precomposed(effectivePalette.grayIcon), #imageLiteral(resourceName: "Icon_SearchClear").precomposed(effectivePalette.grayIcon), { strings().searchFieldSearch }, effectivePalette.text, effectivePalette.grayText), chatList: chatList, tabBar: tabBar, icons: generateIcons(from: effectivePalette, bubbled: bubbled), bubbled: bubbled, fontSize: fontSize, wallpaper: wallpaper, generated: true, backgroundSize: backgroundSize)
 }
 
-
-func updateTheme(with settings: ThemePaletteSettings, for window: Window? = nil, animated: Bool = false) -> TelegramPresentationTheme {
-    let settingsForTheme: ThemePaletteSettings
-    if FocusProduct.isEnabled {
-        if settings.palette.name == focusTrueBlackPalette.name {
-            settingsForTheme = settings
-        } else {
-            settingsForTheme = settings.withUpdatedPalette(whitePalette).withUpdatedDefaultIsDark(false)
-        }
-    } else {
-        settingsForTheme = settings
+/// Focus fork: light palette locked except OLED (`focusTrueBlackPalette`); stock path passes settings through unchanged.
+fileprivate func themePaletteSettingsForCurrentProduct(_ settings: ThemePaletteSettings) -> ThemePaletteSettings {
+    guard FocusProduct.isEnabled else {
+        return settings
     }
-    
-    let normalizedSettings: ThemePaletteSettings
-    if FocusProduct.isEnabled, settingsForTheme.palette.name == focusTrueBlackPalette.name {
-        normalizedSettings = settingsForTheme.withUpdatedDefaultIsDark(true)
-    } else if settingsForTheme.palette.isDark {
-        normalizedSettings = settingsForTheme
+    if settings.palette.name == focusTrueBlackPalette.name {
+        return settings
+    }
+    return settings.withUpdatedPalette(whitePalette).withUpdatedDefaultIsDark(false)
+}
+
+/// Normalizes dark defaults (Focus OLED vs stock dark handling).
+fileprivate func normalizedThemePaletteSettings(_ settings: ThemePaletteSettings) -> ThemePaletteSettings {
+    if FocusProduct.isEnabled, settings.palette.name == focusTrueBlackPalette.name {
+        return settings.withUpdatedDefaultIsDark(true)
+    }
+    if settings.palette.isDark {
+        return settings
             .withUpdatedToDefault(dark: false, onlyLocal: true)
             .withUpdatedDefaultIsDark(false)
-    } else {
-        normalizedSettings = settingsForTheme.withUpdatedDefaultIsDark(false)
     }
-    
-    let palette: ColorPalette
-    switch normalizedSettings.palette.name {
+    return settings.withUpdatedDefaultIsDark(false)
+}
+
+/// Picks built-in `ColorPalette` when name+accent match defaults; otherwise uses settings’ custom palette.
+fileprivate func resolvedCanonicalPalette(for settings: ThemePaletteSettings) -> ColorPalette {
+    let p = settings.palette
+    switch p.name {
     case whitePalette.name:
-        if normalizedSettings.palette.accent == whitePalette.accent {
-            palette = whitePalette
-        } else {
-            palette = normalizedSettings.palette
-        }
+        return p.accent == whitePalette.accent ? whitePalette : p
     case darkPalette.name:
-        if normalizedSettings.palette.accent == darkPalette.accent {
-            palette = darkPalette
-        } else {
-            palette = normalizedSettings.palette
-        }
+        return p.accent == darkPalette.accent ? darkPalette : p
     case dayClassicPalette.name:
-        if normalizedSettings.palette.accent == dayClassicPalette.accent {
-            palette = dayClassicPalette
-        } else {
-            palette = normalizedSettings.palette
-        }
+        return p.accent == dayClassicPalette.accent ? dayClassicPalette : p
     case nightAccentPalette.name:
-        if normalizedSettings.palette.accent == nightAccentPalette.accent {
-            palette = nightAccentPalette
-        } else {
-            palette = normalizedSettings.palette
-        }
+        return p.accent == nightAccentPalette.accent ? nightAccentPalette : p
     case focusTrueBlackPalette.name:
-        if normalizedSettings.palette.accent == focusTrueBlackPalette.accent {
-            palette = focusTrueBlackPalette
-        } else {
-            palette = normalizedSettings.palette
-        }
+        return p.accent == focusTrueBlackPalette.accent ? focusTrueBlackPalette : p
     case systemPalette.name:
-        palette = dayClassicPalette
+        return dayClassicPalette
     default:
-        palette = normalizedSettings.palette
+        return p
     }
-    let theme = generateTheme(palette: palette, cloudTheme: normalizedSettings.cloudTheme, bubbled: normalizedSettings.bubbled, fontSize: normalizedSettings.fontSize, wallpaper: normalizedSettings.wallpaper)
-    return theme
+}
+
+func updateTheme(with settings: ThemePaletteSettings, for window: Window? = nil, animated: Bool = false) -> TelegramPresentationTheme {
+    let settingsForTheme = themePaletteSettingsForCurrentProduct(settings)
+    let normalizedSettings = normalizedThemePaletteSettings(settingsForTheme)
+    let palette = resolvedCanonicalPalette(for: normalizedSettings)
+    return generateTheme(
+        palette: palette,
+        cloudTheme: normalizedSettings.cloudTheme,
+        bubbled: normalizedSettings.bubbled,
+        fontSize: normalizedSettings.fontSize,
+        wallpaper: normalizedSettings.wallpaper
+    )
 }
 
 private let appearanceDisposable = MetaDisposable()
